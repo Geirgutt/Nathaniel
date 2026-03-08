@@ -42,7 +42,7 @@ const baseJumpVelocity = -10.9;
 const basePlatformWidth = 98;
 const platformHeight = 14;
 const basePlatformGap = 112;
-const runnerTriggerScore = 2000;
+const runnerIntervalScore = 1000;
 const runnerBonusScore = 180;
 const runnerCrashPenalty = 120;
 const runnerGroundY = height - 118;
@@ -59,6 +59,7 @@ const leaderboardLimit = 10;
 const discoDurationMs = 8000;
 const jetpackDurationMs = 900;
 const runnerDashDurationMs = 380;
+const mapGoalHeight = 5000;
 const supabaseConfig = window.SUPABASE_CONFIG || { url: "", publishableKey: "", table: "scores" };
 const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
 const lowFxMode = isCoarsePointer;
@@ -222,6 +223,7 @@ const music = {
 
 const defaultProgression = {
   bankCoins: 0,
+  clearedMaps: [],
   ownedSkins: ["starter"],
   selectedSkin: "starter",
   ownedMaps: ["sky"],
@@ -271,8 +273,9 @@ const state = {
     triggered: false,
     completed: false,
     distance: 0,
-    nextObstacleAt: 220,
-    portalDistance: 980,
+    nextObstacleAt: 540,
+    portalDistance: 1650,
+    nextTriggerScore: runnerIntervalScore,
     obstacles: [],
     portal: null,
     dashUntil: 0,
@@ -319,6 +322,7 @@ function setScoreStatus(message) {
 function cloneDefaultProgression() {
   return {
     bankCoins: defaultProgression.bankCoins,
+    clearedMaps: [...defaultProgression.clearedMaps],
     ownedSkins: [...defaultProgression.ownedSkins],
     selectedSkin: defaultProgression.selectedSkin,
     ownedMaps: [...defaultProgression.ownedMaps],
@@ -346,7 +350,8 @@ function loadProgression() {
     ...loaded,
     ownedSkins: uniqueList([...(loaded.ownedSkins || defaultProgression.ownedSkins)]).filter((id) => skins[id]),
     ownedMaps: uniqueList([...(loaded.ownedMaps || defaultProgression.ownedMaps)]).filter((id) => maps[id]),
-    ownedSkills: uniqueList([...(loaded.ownedSkills || defaultProgression.ownedSkills)]).filter((id) => skills[id])
+    ownedSkills: uniqueList([...(loaded.ownedSkills || defaultProgression.ownedSkills)]).filter((id) => skills[id]),
+    clearedMaps: uniqueList([...(loaded.clearedMaps || defaultProgression.clearedMaps)]).filter((id) => maps[id])
   };
 
   if (!progression.ownedSkins.includes("starter")) progression.ownedSkins.unshift("starter");
@@ -360,7 +365,33 @@ function loadProgression() {
   if (!progression.ownedSkills.includes(progression.selectedSkill)) progression.selectedSkill = progression.ownedSkills[0];
   progression.bankCoins = Math.max(0, Number(progression.bankCoins) || 0);
   progression.unlockedBanana = Boolean(progression.unlockedBanana);
+  progression.clearedMaps = uniqueList(progression.clearedMaps || []);
   return progression;
+}
+
+function maybeHandleMapClear() {
+  const currentMap = getSelectedMap();
+  if (!currentMap || state.progression.clearedMaps.includes(currentMap.id) || state.heightScore < mapGoalHeight) {
+    return;
+  }
+
+  state.progression.clearedMaps.push(currentMap.id);
+  state.progression.clearedMaps = uniqueList(state.progression.clearedMaps);
+
+  const mapOrder = ["sky", "sunset", "frost"];
+  const nextMapId = mapOrder[mapOrder.indexOf(currentMap.id) + 1];
+  let message = "MAP CLEAR!";
+
+  if (nextMapId && maps[nextMapId] && !state.progression.ownedMaps.includes(nextMapId)) {
+    state.progression.ownedMaps.push(nextMapId);
+    state.progression.ownedMaps = uniqueList(state.progression.ownedMaps);
+    message = `MAP CLEAR! ${maps[nextMapId].name} unlocked`;
+  }
+
+  saveProgression();
+  renderShop();
+  updateProfileBar();
+  addFloatingText(message, width / 2, state.cameraY + 180, "#7cff95", 85);
 }
 
 function saveProgression() {
@@ -699,7 +730,7 @@ function showStartOverlay() {
   leaderboardPanelEl.classList.add("hidden");
   saveScoreEl.disabled = false;
   renderShop();
-  setOverlay("Start rolig, samle coins og bygg opp banken din. Portal-run venter ved 2000 meter.", "Start spill", true);
+  setOverlay("Start rolig, samle coins og bygg opp banken din. Portal-run kommer ved hver 1000m.", "Start spill", true);
 }
 
 async function showGameOverOverlay() {
@@ -991,8 +1022,8 @@ function createObstacle() {
 
 function resetRunnerState() {
   state.runner.distance = 0;
-  state.runner.nextObstacleAt = 220;
-  state.runner.portalDistance = 980;
+  state.runner.nextObstacleAt = 540;
+  state.runner.portalDistance = 1650;
   state.runner.obstacles = [];
   state.runner.portal = null;
   state.runner.dashUntil = 0;
@@ -1047,6 +1078,7 @@ function exitRunnerMode(success) {
   state.runner.completed = success;
   addFloatingText(success ? "PORTAL BOOST!" : "SMELL!", width / 2, state.cameraY + 200, success ? "#00d1ff" : "#ff6b6b", 70);
   updateHud();
+  maybeHandleMapClear();
 }
 function updatePlatforms() {
   for (const platform of state.platforms) {
@@ -1090,6 +1122,7 @@ function resetGame() {
   state.floatingTexts = [];
   state.runner.triggered = false;
   state.runner.completed = false;
+  state.runner.nextTriggerScore = runnerIntervalScore;
   resetRunnerState();
   resetSkillState();
 
@@ -1193,7 +1226,7 @@ function collectPickups() {
       }
 
       if (item.type === "jetpack") {
-        activateJetpack();
+        activateJetpack(isBananaActive() ? -22 : -20, isBananaActive() ? 1600 : 1300);
       }
     }
   }
@@ -1318,10 +1351,11 @@ function updateJumperPlayer() {
       unlockBananaIfNeeded(state.bestScore);
     }
     updateHud();
+    maybeHandleMapClear();
   }
 
-  if (!state.runner.triggered && state.heightScore >= runnerTriggerScore) {
-    state.runner.triggered = true;
+  if (state.heightScore >= state.runner.nextTriggerScore) {
+    state.runner.nextTriggerScore += runnerIntervalScore;
     enterRunnerMode();
     return;
   }
@@ -1373,7 +1407,7 @@ function updateRunnerPlayer() {
 
   if (!runner.portal && runner.distance >= runner.nextObstacleAt) {
     runner.obstacles.push(createObstacle());
-    runner.nextObstacleAt += rand(180, 280);
+    runner.nextObstacleAt += rand(280, 420);
   }
 
   for (const obstacle of runner.obstacles) {
@@ -2145,6 +2179,8 @@ updateControlModeUi();
 updateTouchButtonsVisibility();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
 
 
 
