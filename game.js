@@ -1,5 +1,5 @@
 ﻿const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true }) || canvas.getContext("2d");
 const scoreEl = document.getElementById("score");
 const coinsEl = document.getElementById("coins");
 const levelEl = document.getElementById("level");
@@ -7,8 +7,6 @@ const bestEl = document.getElementById("best");
 const overlayEl = document.getElementById("overlay");
 const messageEl = document.getElementById("message");
 const actionEl = document.getElementById("action");
-const leftButton = document.getElementById("leftButton");
-const rightButton = document.getElementById("rightButton");
 const playerNameEl = document.getElementById("playerName");
 const saveScoreEl = document.getElementById("saveScore");
 const scoreEntryEl = document.getElementById("scoreEntry");
@@ -39,6 +37,8 @@ const discoDurationMs = 8000;
 const jetpackDurationMs = 900;
 const runnerDashDurationMs = 380;
 const supabaseConfig = window.SUPABASE_CONFIG || { url: "", publishableKey: "", table: "scores" };
+const isCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+const lowFxMode = isCoarsePointer;
 
 const music = {
   context: null,
@@ -137,19 +137,8 @@ function setScoreStatus(message) {
 }
 
 function setControlMode() {
-  if (state.mode === "runner") {
-    leftButton.textContent = "Hopp";
-    rightButton.textContent = "Dash";
-    leftButton.setAttribute("aria-label", "Hopp i runner mode");
-    rightButton.setAttribute("aria-label", "Dash i runner mode");
-    return;
-  }
-
-  leftButton.textContent = "Venstre";
-  rightButton.textContent = "Hoyre";
-  leftButton.setAttribute("aria-label", "Ga til venstre");
-  rightButton.setAttribute("aria-label", "Ga til hoyre");
 }
+
 
 function renderLeaderboard(scores) {
   state.leaderboard = scores;
@@ -858,6 +847,8 @@ function updateRunnerPlayer() {
       h: 92
     };
     addFloatingText("PORTAL!", width / 2, runnerGroundY - 120, "#00d1ff", 42);
+    state.touch.active = false;
+    state.touch.axis = 0;
   }
 
   if (!runner.portal && runner.distance >= runner.nextObstacleAt) {
@@ -946,7 +937,7 @@ function drawBackground() {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
-    for (let i = 0; i < 8; i += 1) {
+    for (let i = 0; i < (lowFxMode ? 4 : 8); i += 1) {
       const x = ((i * 80) - (offset * 0.3)) % (width + 100) - 50;
       ctx.fillStyle = "rgba(255,255,255,0.08)";
       ctx.fillRect(x, 70 + (i % 3) * 36, 46, 14);
@@ -974,7 +965,7 @@ function drawBackground() {
   ctx.fillRect(0, 0, width, height);
 
   if (disco) {
-    for (let i = 0; i < 8; i += 1) {
+    for (let i = 0; i < (lowFxMode ? 4 : 8); i += 1) {
       ctx.fillStyle = `hsla(${(state.elapsedMs / 8 + i * 45) % 360}, 90%, 65%, 0.12)`;
       ctx.beginPath();
       ctx.moveTo(width / 2, 140);
@@ -984,7 +975,7 @@ function drawBackground() {
     }
   }
 
-  for (let i = 0; i < 6; i += 1) {
+  for (let i = 0; i < (lowFxMode ? 4 : 6); i += 1) {
     const cloudX = (i * 90 + (state.cameraY * -0.08)) % (width + 120) - 60;
     const cloudY = 60 + i * 90;
     ctx.fillStyle = disco ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.65)";
@@ -1242,50 +1233,49 @@ function startGame() {
   resetGame();
   state.running = true;
   state.lastFrameTime = 0;
+  state.touch.active = false;
+  state.touch.axis = 0;
   scoreEntryEl.classList.add("hidden");
   leaderboardPanelEl.classList.add("hidden");
   setOverlay("", "", false);
   state.player.vy = getJumpVelocity();
 }
 
-function setDirectionalInput(direction, isPressed) {
-  if (state.mode === "runner") {
-    const button = direction === "left" ? leftButton : rightButton;
-    button.classList.toggle("is-pressed", isPressed);
-    if (isPressed) {
-      if (direction === "left") {
-        state.runner.jumpQueued = true;
-      } else {
-        state.runner.dashQueued = true;
-      }
-    }
-    return;
-  }
-
-  state.keys[direction] = isPressed;
-  const button = direction === "left" ? leftButton : rightButton;
-  button.classList.toggle("is-pressed", isPressed);
+function getCanvasPoint(event) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: ((event.clientX - rect.left) / rect.width) * width,
+    y: ((event.clientY - rect.top) / rect.height) * height
+  };
 }
 
-function attachHoldControl(button, direction) {
-  const release = () => {
-    if (state.mode !== "runner") {
-      setDirectionalInput(direction, false);
-    } else {
-      button.classList.remove("is-pressed");
-    }
-  };
+function setKeyboardInput(direction, isPressed) {
+  state.keys[direction] = isPressed;
+}
 
-  button.addEventListener("pointerdown", (event) => {
-    event.preventDefault();
-    ensureMusic();
-    setDirectionalInput(direction, true);
-  });
+function updateTouchAxis(x) {
+  const delta = x - state.touch.startX;
+  const deadzone = 18;
+  const maxDistance = 90;
+  if (Math.abs(delta) <= deadzone) {
+    state.touch.axis = 0;
+    return;
+  }
+  state.touch.axis = clamp(delta / maxDistance, -1, 1);
+}
 
-  button.addEventListener("pointerup", release);
-  button.addEventListener("pointercancel", release);
-  button.addEventListener("pointerleave", release);
-  button.addEventListener("lostpointercapture", release);
+function clearTouchInput() {
+  state.touch.active = false;
+  state.touch.pointerId = null;
+  state.touch.axis = 0;
+}
+
+function handleRunnerTap(pointX) {
+  if (pointX < width / 2) {
+    state.runner.jumpQueued = true;
+  } else {
+    state.runner.dashQueued = true;
+  }
 }
 
 window.addEventListener("keydown", (event) => {
@@ -1297,10 +1287,10 @@ window.addEventListener("keydown", (event) => {
 
   if (state.mode === "runner") {
     if (["ArrowLeft", "a", "A", " ", "Spacebar", "Enter"].includes(event.key)) {
-      setDirectionalInput("left", true);
+      state.runner.jumpQueued = true;
     }
     if (event.key === "ArrowRight" || event.key.toLowerCase() === "d") {
-      setDirectionalInput("right", true);
+      state.runner.dashQueued = true;
     }
     if (!state.running && (event.key === " " || event.key === "Spacebar" || event.key === "Enter")) {
       startGame();
@@ -1309,10 +1299,10 @@ window.addEventListener("keydown", (event) => {
   }
 
   if (event.key === "ArrowLeft" || event.key.toLowerCase() === "a") {
-    setDirectionalInput("left", true);
+    setKeyboardInput("left", true);
   }
   if (event.key === "ArrowRight" || event.key.toLowerCase() === "d") {
-    setDirectionalInput("right", true);
+    setKeyboardInput("right", true);
   }
   if (!state.running && (event.key === " " || event.key === "Spacebar" || event.key === "Enter")) {
     startGame();
@@ -1321,24 +1311,18 @@ window.addEventListener("keydown", (event) => {
 
 window.addEventListener("keyup", (event) => {
   if (state.mode === "runner") {
-    if (event.key === "ArrowLeft" || event.key.toLowerCase() === "a" || event.key === " " || event.key === "Spacebar" || event.key === "Enter") {
-      leftButton.classList.remove("is-pressed");
-    }
-    if (event.key === "ArrowRight" || event.key.toLowerCase() === "d") {
-      rightButton.classList.remove("is-pressed");
-    }
     return;
   }
 
   if (event.key === "ArrowLeft" || event.key.toLowerCase() === "a") {
-    setDirectionalInput("left", false);
+    setKeyboardInput("left", false);
   }
   if (event.key === "ArrowRight" || event.key.toLowerCase() === "d") {
-    setDirectionalInput("right", false);
+    setKeyboardInput("right", false);
   }
 });
 
-for (const element of [document.body, canvas, leftButton, rightButton, overlayEl]) {
+for (const element of [document.body, canvas, overlayEl]) {
   element.addEventListener("touchmove", (event) => {
     event.preventDefault();
   }, { passive: false });
@@ -1347,17 +1331,53 @@ for (const element of [document.body, canvas, leftButton, rightButton, overlayEl
 canvas.addEventListener("pointerdown", (event) => {
   event.preventDefault();
   ensureMusic();
+
   if (!state.running) {
     startGame();
-  } else if (state.mode === "runner") {
-    setDirectionalInput("left", true);
+    return;
+  }
+
+  const point = getCanvasPoint(event);
+
+  if (state.mode === "runner") {
+    handleRunnerTap(point.x);
+    return;
+  }
+
+  if (!isCoarsePointer && event.pointerType === "mouse") {
+    return;
+  }
+
+  state.touch.active = true;
+  state.touch.pointerId = event.pointerId;
+  state.touch.startX = point.x;
+  state.touch.axis = 0;
+  if (canvas.setPointerCapture) {
+    canvas.setPointerCapture(event.pointerId);
   }
 });
 
+canvas.addEventListener("pointermove", (event) => {
+  if (!state.touch.active || state.touch.pointerId !== event.pointerId || state.mode !== "jumper") {
+    return;
+  }
+  const point = getCanvasPoint(event);
+  updateTouchAxis(point.x);
+});
+
+const releasePointer = (event) => {
+  if (state.touch.pointerId !== null && event.pointerId !== undefined && state.touch.pointerId !== event.pointerId) {
+    return;
+  }
+  clearTouchInput();
+};
+
+canvas.addEventListener("pointerup", releasePointer);
+canvas.addEventListener("pointercancel", releasePointer);
+canvas.addEventListener("lostpointercapture", releasePointer);
+
 actionEl.addEventListener("click", startGame);
 saveScoreEl.addEventListener("click", submitScore);
-attachHoldControl(leftButton, "left");
-attachHoldControl(rightButton, "right");
 
 playerNameEl.value = localStorage.getItem(playerNameKey) || "";
 playerNameEl.addEventListener("input", () => {
@@ -1373,3 +1393,7 @@ showStartOverlay();
 updateHud();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
+
+
