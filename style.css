@@ -1,0 +1,121 @@
+﻿* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at top, rgba(255, 245, 180, 0.75), transparent 30%),
+    linear-gradient(180deg, #87ceeb 0%, #dff5ff 48%, #f7f7ef 100%);
+  color: #17324d;
+}
+
+.game-shell {
+  position: relative;
+  width: min(92vw, 420px);
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow: 0 18px 60px rgba(23, 50, 77, 0.18);
+  backdrop-filter: blur(12px);
+}
+
+.hud,
+.help {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hud {
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.hud > div {
+  min-width: 74px;
+}
+
+.label,
+.value,
+.help p {
+  margin: 0;
+}
+
+.label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+.value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+#game {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #89d3ff 0%, #d6f2ff 55%, #fff7da 100%);
+}
+
+.help {
+  margin-top: 14px;
+  font-size: 0.95rem;
+  flex-direction: column;
+  color: rgba(23, 50, 77, 0.82);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(10, 26, 44, 0.24);
+  border-radius: 24px;
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.panel {
+  width: min(100%, 320px);
+  padding: 24px;
+  text-align: center;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 40px rgba(10, 26, 44, 0.18);
+}
+
+.panel h1 {
+  margin: 0 0 10px;
+  font-size: 2rem;
+}
+
+.panel p {
+  margin: 0 0 18px;
+}
+
+.panel button {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font: inherit;
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(135deg, #ff8c42, #ff5f6d);
+  cursor: pointer;
+}
+
+.panel button:hover {
+  filter: brightness(1.05);
+}

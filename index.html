@@ -1,0 +1,48 @@
+﻿<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hopp Høyest</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="game-shell">
+    <section class="hud">
+      <div>
+        <p class="label">Høyde</p>
+        <p id="score" class="value">0 m</p>
+      </div>
+      <div>
+        <p class="label">Mynter</p>
+        <p id="coins" class="value">0</p>
+      </div>
+      <div>
+        <p class="label">Level</p>
+        <p id="level" class="value">1</p>
+      </div>
+      <div>
+        <p class="label">Beste</p>
+        <p id="best" class="value">0 m</p>
+      </div>
+    </section>
+
+    <canvas id="game" width="420" height="720" aria-label="Spillflate"></canvas>
+
+    <section class="help">
+      <p>Bruk A/D eller piltaster for å styre i lufta.</p>
+      <p>Samle mynter på vei oppover for å låse opp neste level.</p>
+    </section>
+
+    <div id="overlay" class="overlay hidden">
+      <div class="panel">
+        <h1>Hopp Høyest</h1>
+        <p id="message">Trykk for å starte.</p>
+        <button id="action" type="button">Start spill</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
