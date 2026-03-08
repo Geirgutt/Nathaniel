@@ -227,7 +227,7 @@ const state = {
   leaderboard: [],
   progression: null,
   keys: { left: false, right: false },
-  touch: { active: false, pointerId: null, startX: 0, lastX: 0, lastTime: 0 },
+  touch: { active: false, pointerId: null, startX: 0, startPlayerX: 0, targetX: 0, lastX: 0, lastTime: 0 },
   player: null,
   platforms: [],
   collectibles: [],
@@ -1181,12 +1181,14 @@ function updateJumperPlayer() {
 
   player.bounceSquash *= 0.84;
 
-  if (Math.abs(moveIntent) > 0.04) {
+  if (state.touch.active && isCoarsePointer) {
+    const followDelta = state.touch.targetX - player.x;
+    player.x += followDelta * 0.42;
+    player.vx = clamp((player.vx * 0.4) + (followDelta * 0.09), -maxMoveSpeed * 1.1, maxMoveSpeed * 1.1);
+  } else if (Math.abs(moveIntent) > 0.04) {
     player.vx += moveIntent * airAcceleration;
-  } else if (!state.touch.active) {
-    player.vx *= 0.82;
   } else {
-    player.vx *= 0.92;
+    player.vx *= 0.82;
   }
 
   if (isJetpackActive()) {
@@ -1730,15 +1732,19 @@ function applyTouchSwipe(x, timeStamp) {
   state.touch.lastX = x;
   state.touch.lastTime = timeStamp;
 
-  if (Math.abs(dx) < 1 || !state.player) {
+  if (!state.player) {
     return;
   }
 
-  const directMove = clamp(dx * 1.18, -20, 20);
-  const impulse = clamp((dx / dt) * 0.9, -1.35, 1.35);
+  const totalDelta = x - state.touch.startX;
+  state.touch.targetX = clamp(state.touch.startPlayerX + (totalDelta * 1.12), -state.player.w, width);
 
-  state.player.x += directMove;
-  state.player.vx = clamp((state.player.vx * 0.38) + impulse, -4.2, 4.2);
+  if (Math.abs(dx) < 1) {
+    return;
+  }
+
+  const impulse = clamp((dx / dt) * 0.55, -0.75, 0.75);
+  state.player.vx = clamp((state.player.vx * 0.45) + impulse, -4.5, 4.5);
 }
 
 function clearTouchInput() {
@@ -1865,9 +1871,10 @@ canvas.addEventListener("pointerup", releasePointer);
 canvas.addEventListener("pointercancel", releasePointer);
 canvas.addEventListener("lostpointercapture", releasePointer);
 
-overlayEl.addEventListener("click", (event) => {
+function handleOverlayPress(event) {
   const categoryButton = event.target.closest(".shop-category");
   if (categoryButton) {
+    event.preventDefault();
     setShopCategory(categoryButton.dataset.category);
     return;
   }
@@ -1883,8 +1890,12 @@ overlayEl.addEventListener("click", (event) => {
     return;
   }
 
+  event.preventDefault();
   purchase(kind, id);
-});
+}
+
+overlayEl.addEventListener("click", handleOverlayPress);
+overlayEl.addEventListener("pointerup", handleOverlayPress);
 
 actionEl.addEventListener("click", (event) => {
   event.preventDefault();
@@ -1910,6 +1921,7 @@ updateHud();
 renderShop();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
 
 
 

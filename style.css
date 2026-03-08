@@ -367,3 +367,25 @@ body {
 .shop-section.hidden {
   display: none;
 }
+
+.game-shell {
+  width: 100vw;
+  max-width: 520px;
+  gap: 8px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+#game {
+  height: min(calc(100dvh - 168px), 820px);
+  min-height: 68vh;
+}
+
+.help {
+  font-size: 0.82rem;
+  gap: 4px;
+}
+
+.hud {
+  gap: 8px;
+}
