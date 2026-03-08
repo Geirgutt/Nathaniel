@@ -231,7 +231,7 @@ const state = {
   leaderboard: [],
   progression: null,
   keys: { left: false, right: false },
-  touch: { active: false, pointerId: null, startX: 0, startPlayerX: 0, targetX: 0, lastX: 0, lastTime: 0 },
+  touch: { active: false, pointerId: null, startX: 0, lastX: 0, lastTime: 0 },
   player: null,
   platforms: [],
   collectibles: [],
@@ -1201,11 +1201,7 @@ function updateJumperPlayer() {
 
   player.bounceSquash *= 0.84;
 
-  if (state.touch.active && isCoarsePointer) {
-    const followDelta = state.touch.targetX - player.x;
-    const desiredVx = clamp(followDelta * 0.16, -maxMoveSpeed * 0.95, maxMoveSpeed * 0.95);
-    player.vx = clamp((player.vx * 0.78) + (desiredVx * 0.22), -maxMoveSpeed, maxMoveSpeed);
-  } else if (Math.abs(moveIntent) > 0.04) {
+  if (Math.abs(moveIntent) > 0.04) {
     player.vx += moveIntent * airAcceleration;
   } else {
     player.vx *= 0.82;
@@ -1752,27 +1748,19 @@ function applyTouchSwipe(x, timeStamp) {
   state.touch.lastX = x;
   state.touch.lastTime = timeStamp;
 
-  if (!state.player) {
+  if (!state.player || Math.abs(dx) < 2) {
     return;
   }
 
-  const totalDelta = x - state.touch.startX;
-  state.touch.targetX = clamp(state.touch.startPlayerX + (totalDelta * 0.72), -state.player.w, width);
-
-  if (Math.abs(dx) < 1) {
-    return;
-  }
-
-  const impulse = clamp((dx / dt) * 0.55, -0.75, 0.75);
-  state.player.vx = clamp((state.player.vx * 0.45) + impulse, -4.5, 4.5);
+  const swipeSpeed = dx / dt;
+  const impulse = Math.sign(swipeSpeed) * Math.pow(Math.abs(swipeSpeed), 0.92) * 1.55;
+  state.player.vx = clamp(state.player.vx + clamp(impulse, -1.75, 1.75), -4.4, 4.4);
 }
 
 function clearTouchInput() {
   state.touch.active = false;
   state.touch.pointerId = null;
-  state.touch.startX = 0;
-  state.touch.startPlayerX = 0;
-  state.touch.targetX = 0;
+  state.touch.startX = 0;
   state.touch.lastX = 0;
   state.touch.lastTime = 0;
 }
@@ -1867,8 +1855,6 @@ canvas.addEventListener("pointerdown", (event) => {
   state.touch.active = true;
   state.touch.pointerId = event.pointerId;
   state.touch.startX = point.x;
-  state.touch.startPlayerX = state.player.x;
-  state.touch.targetX = state.player.x;
   state.touch.lastX = point.x;
   state.touch.lastTime = event.timeStamp;
   if (canvas.setPointerCapture) {
@@ -1929,6 +1915,12 @@ updateHud();
 renderShop();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
+
+
+
+
 
 
 
