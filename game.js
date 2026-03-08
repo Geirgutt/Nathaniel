@@ -58,7 +58,7 @@ const coinsPerLevel = 12;
 const leaderboardLimit = 10;
 const discoDurationMs = 8000;
 const jetpackDurationMs = 900;
-const runnerDashDurationMs = 380;
+const runnerDuckDurationMs = 520;
 const mapGoalHeight = 5000;
 const supabaseConfig = window.SUPABASE_CONFIG || { url: "", publishableKey: "", table: "scores" };
 const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
@@ -180,7 +180,7 @@ const skills = {
   frog_hop: {
     id: "frog_hop",
     name: "Froskehopp",
-    description: "Hopp ekstra hardt i starten av runden.",
+    description: "Hvert 3. hopp blir et kraftig boost.",
     cost: 85
   },
   superspeed: {
@@ -273,17 +273,18 @@ const state = {
     triggered: false,
     completed: false,
     distance: 0,
-    nextObstacleAt: 540,
-    portalDistance: 1650,
+    nextObstacleAt: 700,
+    portalDistance: 2600,
+    stage: 1,
     nextTriggerScore: runnerIntervalScore,
     obstacles: [],
     portal: null,
-    dashUntil: 0,
+    duckUntil: 0,
     obstacleCooldownUntil: 0,
-    speed: 6.2,
+    speed: 6.4,
     backgroundOffset: 0,
     jumpQueued: false,
-    dashQueued: false
+    duckQueued: false
   }
 };
 
@@ -730,7 +731,7 @@ function showStartOverlay() {
   leaderboardPanelEl.classList.add("hidden");
   saveScoreEl.disabled = false;
   renderShop();
-  setOverlay("Start rolig, samle coins og bygg opp banken din. Portal-run kommer ved hver 1000m.", "Start spill", true);
+  setOverlay("Start rolig, samle coins og bygg opp banken din. Runner-brett kommer ved hver 1000m med hopp og dukk.", "Start spill", true);
 }
 
 async function showGameOverOverlay() {
@@ -805,12 +806,12 @@ function isJetpackActive() {
   return state.effects.jetpackUntil > state.elapsedMs;
 }
 
-function isRunnerDashActive() {
-  return state.runner.dashUntil > state.elapsedMs;
+function isRunnerDuckActive() {
+  return state.runner.duckUntil > state.elapsedMs;
 }
 
 function isFrogActive() {
-  return state.skillState.frogUntil > state.elapsedMs;
+  return state.progression.selectedSkill === "frog_hop";
 }
 
 function isSpeedSkillActive() {
@@ -912,9 +913,6 @@ function getPlatformGap() {
 function getJumpVelocity() {
   const difficulty = getRunDifficulty();
   let jump = baseJumpVelocity - Math.min(1.2, (state.level - 1) * 0.1) - difficulty * 0.65;
-  if (isFrogActive()) {
-    jump -= 1.6;
-  }
   if (isBananaActive()) {
     jump -= 0.6;
   }
@@ -1012,26 +1010,39 @@ function createPlatform(y, guaranteedCenter = false, previousPlatform = null) {
 }
 
 function createObstacle() {
+  const type = Math.random() < 0.55 ? "low" : "high";
+  if (type === "low") {
+    return {
+      type,
+      x: width + rand(40, 90),
+      y: runnerGroundY,
+      w: rand(30, 46),
+      h: rand(34, 58)
+    };
+  }
+
   return {
+    type,
     x: width + rand(40, 90),
-    y: runnerGroundY,
-    w: rand(30, 48),
-    h: rand(34, 60)
+    y: runnerGroundY - rand(4, 12),
+    w: rand(36, 58),
+    h: rand(24, 34)
   };
 }
 
 function resetRunnerState() {
+  const stage = Math.max(1, state.runner.stage || 1);
   state.runner.distance = 0;
-  state.runner.nextObstacleAt = 540;
-  state.runner.portalDistance = 1650;
+  state.runner.nextObstacleAt = 700;
+  state.runner.portalDistance = 2600 + (stage - 1) * 260;
   state.runner.obstacles = [];
   state.runner.portal = null;
-  state.runner.dashUntil = 0;
+  state.runner.duckUntil = 0;
   state.runner.obstacleCooldownUntil = 0;
-  state.runner.speed = 6.3 + state.level * 0.28;
+  state.runner.speed = 6.0 + state.level * 0.22 + stage * 0.42;
   state.runner.backgroundOffset = 0;
   state.runner.jumpQueued = false;
-  state.runner.dashQueued = false;
+  state.runner.duckQueued = false;
 }
 
 function enterRunnerMode() {
@@ -1040,12 +1051,12 @@ function enterRunnerMode() {
   state.effects.discoUntil = 0;
   state.effects.jetpackUntil = 0;
   resetRunnerState();
-  state.player.x = 84;
+  state.player.x = 94;
   state.player.y = runnerGroundY - state.player.h;
   state.player.vx = 0;
   state.player.vy = 0;
   state.player.bounceSquash = 0;
-  addFloatingText("PORTAL RUN!", width / 2, state.cameraY + 220, "#00d1ff", 72);
+  addFloatingText(`RUNNER BRETT ${state.runner.stage}`, width / 2, state.cameraY + 220, "#00d1ff", 72);
 }
 
 function rebuildJumperWorld(baseY) {
@@ -1063,7 +1074,9 @@ function rebuildJumperWorld(baseY) {
 function exitRunnerMode(success) {
   state.mode = "jumper";
   updateTouchButtonsVisibility();
-  state.heightScore = Math.max(0, state.heightScore + (success ? runnerBonusScore : -runnerCrashPenalty));
+  const runnerReward = runnerBonusScore + state.runner.stage * 90;
+  const runnerPenalty = runnerCrashPenalty + (state.runner.stage - 1) * 30;
+  state.heightScore = Math.max(0, state.heightScore + (success ? runnerReward : -runnerPenalty));
   state.cameraY = -state.heightScore * 10;
 
   const baseY = state.cameraY + height - 104;
@@ -1076,7 +1089,7 @@ function exitRunnerMode(success) {
   state.player.bounceSquash = 0.9;
 
   state.runner.completed = success;
-  addFloatingText(success ? "PORTAL BOOST!" : "SMELL!", width / 2, state.cameraY + 200, success ? "#00d1ff" : "#ff6b6b", 70);
+  addFloatingText(success ? "PORTAL BOOST!" : "TRUFFET!", width / 2, state.cameraY + 200, success ? "#00d1ff" : "#ff6b6b", 70);
   updateHud();
   maybeHandleMapClear();
 }
@@ -1099,7 +1112,8 @@ function resetSkillState() {
   state.skillState = {
     selected,
     extraLifeUsed: false,
-    frogUntil: selected === "frog_hop" ? 9000 : 0,
+    frogUntil: 0,
+    frogJumpCount: 0,
     speedUntil: selected === "superspeed" ? 10000 : 0,
     bananaTriggered: false,
     bananaPulseUntil: 0
@@ -1122,6 +1136,8 @@ function resetGame() {
   state.floatingTexts = [];
   state.runner.triggered = false;
   state.runner.completed = false;
+  state.runner.stage = 1;
+
   state.runner.nextTriggerScore = runnerIntervalScore;
   resetRunnerState();
   resetSkillState();
@@ -1317,6 +1333,13 @@ function updateJumperPlayer() {
     if (player.vy > 0 && wasAbove && touchingX && touchingY) {
       player.y = platform.y - player.h;
       player.vy = getJumpVelocity();
+      if (isFrogActive()) {
+        state.skillState.frogJumpCount = (state.skillState.frogJumpCount || 0) + 1;
+        if (state.skillState.frogJumpCount % 3 === 0) {
+          player.vy -= 2.2;
+          addFloatingText("FROSKEBOOST!", player.x + player.w / 2, player.y - 12, "#7cff95", 44);
+        }
+      }
       player.bounceSquash = 1;
 
       if (platform.vx) {
@@ -1355,6 +1378,7 @@ function updateJumperPlayer() {
   }
 
   if (state.heightScore >= state.runner.nextTriggerScore) {
+    state.runner.stage = Math.max(1, Math.floor(state.runner.nextTriggerScore / runnerIntervalScore));
     state.runner.nextTriggerScore += runnerIntervalScore;
     enterRunnerMode();
     return;
@@ -1370,28 +1394,31 @@ function updateJumperPlayer() {
 function updateRunnerPlayer() {
   const player = state.player;
   const runner = state.runner;
-  const dashActive = isRunnerDashActive();
-  const speed = runner.speed + (dashActive ? 2.1 : 0) + Math.min(2.4, state.level * 0.22);
+  const duckActive = isRunnerDuckActive();
+  const speed = runner.speed + Math.min(2.6, state.level * 0.24) + Math.min(1.8, (runner.stage - 1) * 0.2);
 
   runner.distance += speed;
   runner.backgroundOffset += speed;
 
   if (runner.jumpQueued) {
-    if (player.y >= runnerGroundY - player.h - 0.5) {
-      player.vy = -10.8;
-      player.bounceSquash = 0.6;
+    if (player.y >= runnerGroundY - player.h - 0.5 && !duckActive) {
+      player.vy = -11.2;
+      player.bounceSquash = 0.62;
     }
     runner.jumpQueued = false;
   }
 
-  if (runner.dashQueued) {
-    runner.dashUntil = state.elapsedMs + runnerDashDurationMs;
-    runner.dashQueued = false;
+  if (runner.duckQueued) {
+    if (player.y >= runnerGroundY - player.h - 0.5) {
+      runner.duckUntil = state.elapsedMs + runnerDuckDurationMs;
+      player.bounceSquash = 0.35;
+    }
+    runner.duckQueued = false;
   }
 
   player.vy += 0.58;
   player.y += player.vy;
-  player.x = dashActive ? 132 : 92;
+  player.x = 94;
   player.bounceSquash *= 0.85;
 
   if (player.y > runnerGroundY - player.h) {
@@ -1400,26 +1427,33 @@ function updateRunnerPlayer() {
   }
 
   if (!runner.portal && runner.distance >= runner.portalDistance) {
-    runner.portal = { x: width + 80, y: runnerGroundY - 92, w: 54, h: 92 };
+    runner.portal = { x: width + 80, y: runnerGroundY - 96, w: 58, h: 96 };
     addFloatingText("PORTAL!", width / 2, runnerGroundY - 120, "#00d1ff", 42);
     clearTouchInput();
   }
 
   if (!runner.portal && runner.distance >= runner.nextObstacleAt) {
     runner.obstacles.push(createObstacle());
-    runner.nextObstacleAt += rand(280, 420);
+    const baseSpacing = 360 - Math.min(120, runner.stage * 18);
+    runner.nextObstacleAt += rand(Math.max(210, baseSpacing), Math.max(300, baseSpacing + 120));
   }
 
   for (const obstacle of runner.obstacles) {
     obstacle.x -= speed;
   }
-  runner.obstacles = runner.obstacles.filter((obstacle) => obstacle.x + obstacle.w > -40);
+  runner.obstacles = runner.obstacles.filter((obstacle) => obstacle.x + obstacle.w > -60);
 
   if (runner.portal) {
     runner.portal.x -= speed;
   }
 
-  const playerBox = { x: player.x + 6, y: player.y + 6, w: player.w - 12, h: player.h - 6 };
+  const boxHeight = duckActive ? player.h * 0.56 : player.h - 6;
+  const playerBox = {
+    x: player.x + 6,
+    y: player.y + (duckActive ? player.h - boxHeight : 6),
+    w: player.w - 12,
+    h: boxHeight
+  };
 
   if (runner.portal) {
     const portalHit = playerBox.x < runner.portal.x + runner.portal.w &&
@@ -1435,22 +1469,19 @@ function updateRunnerPlayer() {
 
   if (state.elapsedMs > runner.obstacleCooldownUntil) {
     for (const obstacle of runner.obstacles) {
+      const obstacleTop = obstacle.y - obstacle.h;
       const hit = playerBox.x < obstacle.x + obstacle.w &&
         playerBox.x + playerBox.w > obstacle.x &&
         playerBox.y < obstacle.y &&
-        playerBox.y + playerBox.h > obstacle.y - obstacle.h;
+        playerBox.y + playerBox.h > obstacleTop;
 
       if (!hit) {
         continue;
       }
 
-      if (dashActive) {
-        addFloatingText("SMASH!", obstacle.x, obstacle.y - obstacle.h, "#ffd166", 28);
-        obstacle.x = -200;
-      } else {
-        runner.obstacleCooldownUntil = state.elapsedMs + 700;
-        exitRunnerMode(false);
-      }
+      runner.obstacleCooldownUntil = state.elapsedMs + 700;
+      addFloatingText(obstacle.type === "high" ? "DUKK!" : "HOPP!", obstacle.x, obstacleTop - 8, "#ff6b6b", 30);
+      exitRunnerMode(false);
       break;
     }
   }
@@ -1678,9 +1709,10 @@ function drawPlayer() {
   const squash = 1 + player.bounceSquash * 0.12;
   const stretch = 1 - player.bounceSquash * 0.08;
   const bodyW = player.w * squash;
-  const bodyH = player.h * stretch;
+  const ducking = state.mode === "runner" && isRunnerDuckActive();
+  const bodyH = player.h * stretch * (ducking ? 0.68 : 1);
   const bodyX = screenX - (bodyW - player.w) / 2;
-  const bodyY = screenY + (player.h - bodyH);
+  const bodyY = screenY + (player.h - bodyH) + (ducking ? 8 : 0);
   const disco = isDiscoActive();
 
   if (isJetpackActive() && state.mode !== "runner") {
@@ -1697,11 +1729,9 @@ function drawPlayer() {
     ctx.fill();
   }
 
-  if (state.mode === "runner" && isRunnerDashActive()) {
-    ctx.fillStyle = "rgba(0,209,255,0.22)";
-    for (let i = 0; i < 3; i += 1) {
-      ctx.fillRect(screenX - (i + 1) * 18, screenY + 16, 18, 12);
-    }
+  if (state.mode === "runner" && isRunnerDuckActive()) {
+    ctx.fillStyle = "rgba(0,209,255,0.18)";
+    ctx.fillRect(screenX - 10, screenY + 26, player.w + 20, 10);
   }
 
   ctx.fillStyle = disco ? `hsl(${(state.elapsedMs / 6) % 360}, 80%, 52%)` : skin.colors.body;
@@ -1771,10 +1801,12 @@ function drawRunnerUi() {
   }
 
   ctx.fillStyle = "rgba(15, 23, 42, 0.55)";
-  ctx.fillRect(14, 14, 170, 46);
+  ctx.fillRect(14, 14, 240, 54);
   ctx.fillStyle = "#ffffff";
   ctx.font = "bold 18px Trebuchet MS";
-  ctx.fillText(`Portal: ${Math.max(0, Math.floor((state.runner.portalDistance - state.runner.distance) / 10))} m`, 24, 42);
+  ctx.fillText(`Mål: ${Math.max(0, Math.floor((state.runner.portalDistance - state.runner.distance) / 10))} m`, 24, 38);
+  ctx.font = "13px Trebuchet MS";
+  ctx.fillText("Venstre: hopp  Høyre: dukk", 24, 58);
 }
 
 function drawFrame() {
@@ -1879,12 +1911,12 @@ function handleRunnerTap(pointX) {
   if (pointX < width / 2) {
     state.runner.jumpQueued = true;
   } else {
-    state.runner.dashQueued = true;
+    state.runner.duckQueued = true;
   }
 }
 
 window.addEventListener("keydown", (event) => {
-  if (["ArrowLeft", "ArrowRight", " ", "Spacebar", "Enter"].includes(event.key)) {
+  if (["ArrowLeft", "ArrowRight", "ArrowDown", " ", "Spacebar", "Enter"].includes(event.key)) {
     event.preventDefault();
   }
 
@@ -1894,8 +1926,8 @@ window.addEventListener("keydown", (event) => {
     if (["ArrowLeft", "a", "A", " ", "Spacebar", "Enter"].includes(event.key)) {
       state.runner.jumpQueued = true;
     }
-    if (event.key === "ArrowRight" || event.key.toLowerCase() === "d") {
-      state.runner.dashQueued = true;
+    if (["ArrowRight", "ArrowDown", "s", "S"].includes(event.key) || event.key.toLowerCase() === "d") {
+      state.runner.duckQueued = true;
     }
     if (!state.running && (event.key === " " || event.key === "Spacebar" || event.key === "Enter")) {
       startGame();
@@ -2179,6 +2211,9 @@ updateControlModeUi();
 updateTouchButtonsVisibility();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
+
 
 
 
