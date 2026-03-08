@@ -342,7 +342,7 @@ function updateMusic() {
   }
 
   const lookAhead = 0.18;
-  const intensity = Math.min(1, 0.15 + (state.heightScore / 120) + (state.level - 1) * 0.1);
+  const intensity = Math.min(1, 0.22 + (state.heightScore / 90) + (state.level - 1) * 0.14);
   const beatLength = state.running ? 0.24 - intensity * 0.05 : 0.29;
 
   music.master.gain.setTargetAtTime(state.running ? 0.19 : 0.1, music.context.currentTime, 0.08);
@@ -364,24 +364,24 @@ function updateMusic() {
 }
 
 function getRunDifficulty() {
-  const heightFactor = Math.min(1.2, state.heightScore / 120);
-  const levelFactor = Math.min(1.1, (state.level - 1) / 3);
-  return clamp(0.18 + heightFactor * 0.85 + levelFactor * 0.6, 0, 1.45);
+  const heightFactor = Math.min(1.35, state.heightScore / 85);
+  const levelFactor = Math.min(1.2, (state.level - 1) / 2.2);
+  return clamp(0.32 + heightFactor * 0.95 + levelFactor * 0.75, 0, 1.75);
 }
 
 function getPlatformWidth() {
   const difficulty = getRunDifficulty();
-  return Math.max(44, basePlatformWidth - state.level * 3 - difficulty * 22);
+  return Math.max(40, basePlatformWidth - state.level * 4 - difficulty * 24);
 }
 
 function getPlatformGap() {
   const difficulty = getRunDifficulty();
-  return Math.min(146, basePlatformGap + state.level * 4 + difficulty * 20);
+  return Math.min(154, basePlatformGap + state.level * 5 + difficulty * 24);
 }
 
 function getJumpVelocity() {
   const difficulty = getRunDifficulty();
-  return baseJumpVelocity - Math.min(1.0, (state.level - 1) * 0.08) - difficulty * 0.55;
+  return baseJumpVelocity - Math.min(1.2, (state.level - 1) * 0.1) - difficulty * 0.65;
 }
 
 function getGravity(vy) {
@@ -423,8 +423,8 @@ function maybeCreateCollectible(platform) {
 function createPlatform(y, guaranteedCenter = false, previousPlatform = null) {
   const platformWidth = getPlatformWidth();
   const difficulty = getRunDifficulty();
-  const movingChance = guaranteedCenter ? 0 : clamp((difficulty - 0.15) * 0.5, 0, 0.45);
-  const maxOffset = 72 + difficulty * 34;
+  const movingChance = guaranteedCenter ? 0 : clamp((difficulty - 0.05) * 0.58, 0, 0.55);
+  const maxOffset = 80 + difficulty * 42;
 
   let x;
   if (guaranteedCenter || !previousPlatform) {
@@ -557,8 +557,8 @@ function finishRun() {
 function updatePlayer() {
   const player = state.player;
   const difficulty = getRunDifficulty();
-  const airAcceleration = 0.35 + difficulty * 0.07;
-  const maxMoveSpeed = moveSpeed + difficulty * 0.5;
+  const airAcceleration = 0.36 + difficulty * 0.08;
+  const maxMoveSpeed = moveSpeed + difficulty * 0.62;
 
   if (state.keys.left) {
     player.vx = Math.max(player.vx - airAcceleration, -maxMoveSpeed);
@@ -829,3 +829,4 @@ showStartOverlay();
 updateHud();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
