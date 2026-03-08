@@ -36,20 +36,6 @@
       <button id="rightButton" class="control-button" type="button" aria-label="Gå til høyre">Høyre</button>
     </section>
 
-    <section class="scoreboard" aria-label="Toppliste">
-      <div class="scoreboard-head">
-        <div>
-          <p class="label">Kallenavn</p>
-          <input id="playerName" class="name-input" type="text" maxlength="16" placeholder="Skriv navn">
-        </div>
-        <button id="refreshScores" class="ghost-button" type="button">Oppdater</button>
-      </div>
-      <p id="scoreStatus" class="score-status">Topplisten lastes lokalt til Supabase er satt opp.</p>
-      <ol id="leaderboard" class="leaderboard-list">
-        <li>Ingen score enda.</li>
-      </ol>
-    </section>
-
     <section class="help">
       <p>Bruk A/D, piltaster eller touch-knappene nederst.</p>
       <p>Samle mynter på vei oppover for å låse opp neste level.</p>
@@ -59,6 +45,20 @@
       <div class="panel">
         <h1>Hopp Høyest</h1>
         <p id="message">Trykk for å starte.</p>
+
+        <section id="scoreEntry" class="score-entry hidden">
+          <label class="label" for="playerName">Kallenavn</label>
+          <input id="playerName" class="name-input" type="text" maxlength="16" placeholder="Skriv navn">
+          <button id="saveScore" class="ghost-button wide-button" type="button">Lagre score</button>
+        </section>
+
+        <section id="leaderboardPanel" class="scoreboard hidden" aria-label="Toppliste">
+          <p id="scoreStatus" class="score-status">Henter toppliste...</p>
+          <ol id="leaderboard" class="leaderboard-list">
+            <li>Ingen score enda.</li>
+          </ol>
+        </section>
+
         <button id="action" type="button">Start spill</button>
       </div>
     </div>

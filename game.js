@@ -10,9 +10,11 @@ const actionEl = document.getElementById("action");
 const leftButton = document.getElementById("leftButton");
 const rightButton = document.getElementById("rightButton");
 const playerNameEl = document.getElementById("playerName");
-const refreshScoresEl = document.getElementById("refreshScores");
+const saveScoreEl = document.getElementById("saveScore");
+const scoreEntryEl = document.getElementById("scoreEntry");
 const scoreStatusEl = document.getElementById("scoreStatus");
 const leaderboardEl = document.getElementById("leaderboard");
+const leaderboardPanelEl = document.getElementById("leaderboardPanel");
 
 const width = canvas.width;
 const height = canvas.height;
@@ -57,6 +59,7 @@ const state = {
   coins: 0,
   level: 1,
   scoreSubmitted: false,
+  leaderboard: [],
   keys: { left: false, right: false },
   player: null,
   platforms: [],
@@ -89,6 +92,8 @@ function setScoreStatus(message) {
 }
 
 function renderLeaderboard(scores) {
+  state.leaderboard = scores;
+
   if (!scores.length) {
     leaderboardEl.innerHTML = "<li>Ingen score enda.</li>";
     return;
@@ -111,11 +116,21 @@ function writeLocalLeaderboard(scores) {
   localStorage.setItem(localLeaderboardKey, JSON.stringify(scores.slice(0, leaderboardLimit)));
 }
 
+function qualifiesForLeaderboard(score) {
+  if (state.leaderboard.length < leaderboardLimit) {
+    return score > 0;
+  }
+
+  const lastScore = state.leaderboard[state.leaderboard.length - 1]?.score ?? 0;
+  return score >= lastScore;
+}
+
 async function fetchLeaderboard() {
   if (!hasSupabaseConfig()) {
-    renderLeaderboard(readLocalLeaderboard());
+    const scores = readLocalLeaderboard();
+    renderLeaderboard(scores);
     setScoreStatus("Fyll inn Supabase i config.js for delt toppliste. Viser lokal liste forelopig.");
-    return;
+    return scores;
   }
 
   setScoreStatus("Henter toppliste...");
@@ -140,10 +155,13 @@ async function fetchLeaderboard() {
 
     const scores = await response.json();
     renderLeaderboard(scores);
-    setScoreStatus("Delt toppliste er aktiv.");
+    setScoreStatus("Toppliste.");
+    return scores;
   } catch {
-    renderLeaderboard(readLocalLeaderboard());
+    const scores = readLocalLeaderboard();
+    renderLeaderboard(scores);
     setScoreStatus("Kunne ikke hente Supabase-toppliste. Viser lokal liste.");
+    return scores;
   }
 }
 
@@ -154,9 +172,13 @@ async function submitScore() {
 
   const name = getPlayerName();
   if (!name) {
-    setScoreStatus("Skriv inn et kallenavn for a lagre score.");
+    setScoreStatus("Skriv inn kallenavn for a lagre score.");
+    playerNameEl.focus();
     return;
   }
+
+  localStorage.setItem(playerNameKey, name);
+  playerNameEl.value = name;
 
   const entry = {
     name,
@@ -165,6 +187,7 @@ async function submitScore() {
   };
 
   state.scoreSubmitted = true;
+  saveScoreEl.disabled = true;
 
   if (!hasSupabaseConfig()) {
     const scores = [entry, ...readLocalLeaderboard()]
@@ -172,7 +195,8 @@ async function submitScore() {
       .slice(0, leaderboardLimit);
     writeLocalLeaderboard(scores);
     renderLeaderboard(scores);
-    setScoreStatus("Score lagret lokalt. Sett opp Supabase for delt toppliste.");
+    setScoreStatus("Score lagret lokalt.");
+    scoreEntryEl.classList.add("hidden");
     return;
   }
 
@@ -194,24 +218,46 @@ async function submitScore() {
       throw new Error(`Lagringsfeil: ${response.status}`);
     }
 
-    setScoreStatus("Score lagret i delt toppliste.");
+    scoreEntryEl.classList.add("hidden");
+    setScoreStatus("Score lagret.");
     await fetchLeaderboard();
   } catch {
     state.scoreSubmitted = false;
-    setScoreStatus("Kunne ikke lagre score til Supabase.");
+    saveScoreEl.disabled = false;
+    setScoreStatus("Kunne ikke lagre score.");
   }
-}
-
-function getRunDifficulty() {
-  const heightFactor = Math.min(1.2, state.heightScore / 120);
-  const levelFactor = Math.min(1.1, (state.level - 1) / 3);
-  return clamp(0.18 + heightFactor * 0.85 + levelFactor * 0.6, 0, 1.45);
 }
 
 function setOverlay(title, buttonText, show = true) {
   messageEl.textContent = title;
   actionEl.textContent = buttonText;
   overlayEl.classList.toggle("hidden", !show);
+}
+
+function showStartOverlay() {
+  scoreEntryEl.classList.add("hidden");
+  leaderboardPanelEl.classList.add("hidden");
+  saveScoreEl.disabled = false;
+  setOverlay("Trykk pa start og hopp sa hoyt du kan. Samle 12 mynter for neste level.", "Start spill", true);
+}
+
+async function showGameOverOverlay() {
+  const score = Math.floor(state.heightScore);
+  scoreEntryEl.classList.add("hidden");
+  leaderboardPanelEl.classList.remove("hidden");
+  saveScoreEl.disabled = false;
+
+  const scores = await fetchLeaderboard();
+  const qualifies = qualifiesForLeaderboard(score);
+
+  if (qualifies) {
+    scoreEntryEl.classList.remove("hidden");
+    setScoreStatus("Ny toppliste-score. Lagre navnet ditt.");
+  } else if (scores.length) {
+    setScoreStatus("Ikke top 10 denne gangen, men her er lista.");
+  }
+
+  setOverlay(`Du kom til level ${state.level} og nadde ${score} meter.`, "Prov igjen", true);
 }
 
 function ensureMusic() {
@@ -299,6 +345,12 @@ function updateMusic() {
     music.nextNoteTime += beatLength;
     music.step += 1;
   }
+}
+
+function getRunDifficulty() {
+  const heightFactor = Math.min(1.2, state.heightScore / 120);
+  const levelFactor = Math.min(1.1, (state.level - 1) / 3);
+  return clamp(0.18 + heightFactor * 0.85 + levelFactor * 0.6, 0, 1.45);
 }
 
 function getPlatformWidth() {
@@ -482,8 +534,7 @@ function updateFloatingTexts() {
 
 function finishRun() {
   state.running = false;
-  setOverlay(`Du kom til level ${state.level} og nadde ${Math.floor(state.heightScore)} meter.`, "Prov igjen");
-  submitScore();
+  showGameOverOverlay();
 }
 
 function updatePlayer() {
@@ -648,6 +699,8 @@ function startGame() {
   ensureMusic();
   resetGame();
   state.running = true;
+  scoreEntryEl.classList.add("hidden");
+  leaderboardPanelEl.classList.add("hidden");
   setOverlay("", "", false);
   state.player.vy = getJumpVelocity();
 }
@@ -715,6 +768,7 @@ canvas.addEventListener("pointerdown", (event) => {
 });
 
 actionEl.addEventListener("click", startGame);
+saveScoreEl.addEventListener("click", submitScore);
 attachHoldControl(leftButton, "left");
 attachHoldControl(rightButton, "right");
 
@@ -727,12 +781,8 @@ playerNameEl.addEventListener("input", () => {
   localStorage.setItem(playerNameKey, cleanName);
 });
 
-refreshScoresEl.addEventListener("click", fetchLeaderboard);
-
 resetGame();
-setOverlay("Trykk pa start og hopp sa hoyt du kan. Samle 12 mynter for neste level.", "Start spill");
+showStartOverlay();
 updateHud();
 fetchLeaderboard();
 loop();
-
-
