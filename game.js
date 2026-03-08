@@ -19,6 +19,10 @@ const selectedSkillNameEl = document.getElementById("selectedSkillName");
 const skinsShopEl = document.getElementById("skinsShop");
 const mapsShopEl = document.getElementById("mapsShop");
 const skillsShopEl = document.getElementById("skillsShop");
+const skinsSectionEl = document.getElementById("skinsSection");
+const mapsSectionEl = document.getElementById("mapsSection");
+const skillsSectionEl = document.getElementById("skillsSection");
+const shopCategoryEls = Array.from(document.querySelectorAll(".shop-category"));
 
 const width = canvas.width;
 const height = canvas.height;
@@ -1925,6 +1929,8 @@ updateHud();
 renderShop();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
 
 
 
