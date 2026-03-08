@@ -23,7 +23,7 @@ const maxFrameDeltaMs = 100;
 const maxUpdatesPerFrame = 4;
 const moveSpeed = 2.8;
 const baseJumpVelocity = -10.9;
-const basePlatformWidth = 88;
+const basePlatformWidth = 98;
 const platformHeight = 14;
 const basePlatformGap = 112;
 const bestScoreKey = "hopp-hoyest-best";
@@ -371,7 +371,7 @@ function getRunDifficulty() {
 
 function getPlatformWidth() {
   const difficulty = getRunDifficulty();
-  return Math.max(40, basePlatformWidth - state.level * 4 - difficulty * 24);
+  return Math.max(40, basePlatformWidth - state.level * 4 - difficulty * 26);
 }
 
 function getPlatformGap() {
@@ -829,4 +829,5 @@ showStartOverlay();
 updateHud();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
 
