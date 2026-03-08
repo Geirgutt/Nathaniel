@@ -2008,12 +2008,29 @@ function updateControlSpeedUi() {
   }
 }
 
+function positionTouchButtons() {
+  if (!touchButtonsEl) {
+    return;
+  }
+
+  const leftInset = canvas.offsetLeft + 10;
+  const topPos = canvas.offsetTop + canvas.clientHeight - 108;
+  const widthPx = Math.max(120, canvas.clientWidth - 20);
+
+  touchButtonsEl.style.left = `${leftInset}px`;
+  touchButtonsEl.style.width = `${widthPx}px`;
+  touchButtonsEl.style.top = `${topPos}px`;
+}
+
 function updateTouchButtonsVisibility() {
   if (!touchButtonsEl) {
     return;
   }
 
   const shouldShow = isCoarsePointer && state.running && state.mode === "jumper" && state.controlMode === "buttons" && overlayEl.classList.contains("hidden") && (settingsPanelEl?.classList.contains("hidden") ?? true);
+  if (shouldShow) {
+    positionTouchButtons();
+  }
   touchButtonsEl.classList.toggle("hidden", !shouldShow);
 }
 
@@ -2101,6 +2118,15 @@ if (controlModeButtonsEl) {
     setControlMode("buttons");
   });
 }
+window.addEventListener("resize", () => {
+  positionTouchButtons();
+  updateTouchButtonsVisibility();
+});
+
+window.addEventListener("orientationchange", () => {
+  positionTouchButtons();
+  updateTouchButtonsVisibility();
+});
 state.progression = loadProgression();
 applyBodyTheme();
 resetGame();
@@ -2112,6 +2138,10 @@ updateControlModeUi();
 updateTouchButtonsVisibility();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
+
+
 
 
 
