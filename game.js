@@ -1114,7 +1114,7 @@ function resetSkillState() {
     extraLifeUsed: false,
     frogUntil: 0,
     frogJumpCount: 0,
-    speedUntil: selected === "superspeed" ? 10000 : 0,
+    speedUntil: selected === "superspeed" ? 12000 : 0,
     bananaTriggered: false,
     bananaPulseUntil: 0
   };
@@ -1290,8 +1290,9 @@ function updateJumperPlayer() {
   const difficulty = getRunDifficulty();
   const moveIntent = getMoveIntent();
   const controlMult = getControlSpeedMultiplier();
-  const airAcceleration = (0.36 + difficulty * 0.08 + (isSpeedSkillActive() ? 0.11 : 0) + (isBananaActive() ? 0.18 : 0)) * controlMult;
-  const maxMoveSpeed = (moveSpeed + difficulty * 0.62 + (isSpeedSkillActive() ? 1.15 : 0) + (isBananaActive() ? 2.2 : 0)) * controlMult;
+  const speedSkillBonus = isSpeedSkillActive() ? 1 : 0;
+  const airAcceleration = (0.36 + difficulty * 0.08 + speedSkillBonus * 0.22 + (isBananaActive() ? 0.18 : 0)) * controlMult;
+  const maxMoveSpeed = (moveSpeed + difficulty * 0.62 + speedSkillBonus * 2.35 + (isBananaActive() ? 2.2 : 0)) * controlMult;
   const touchSpeedCap = state.touch.active && isCoarsePointer ? maxMoveSpeed * 1.24 : maxMoveSpeed;
 
   player.bounceSquash *= 0.84;
@@ -1888,12 +1889,13 @@ function applyTouchSwipe(x, timeStamp) {
   }
 
   const speedMult = getControlSpeedMultiplier();
+  const speedSkillScale = isSpeedSkillActive() ? 1.28 : 1;
   const swipeSpeed = dx / dt;
   state.touch.lastSwipeSpeed = (state.touch.lastSwipeSpeed * 0.35) + (swipeSpeed * 0.65);
 
-  const targetVx = clamp(swipeSpeed * 13.2 * speedMult, -5.8 * speedMult, 5.8 * speedMult);
-  const impulse = Math.sign(swipeSpeed) * Math.pow(Math.abs(swipeSpeed), 0.88) * 1.25 * speedMult;
-  state.player.vx = clamp((state.player.vx * 0.45) + (targetVx * 0.55) + clamp(impulse, -1.65 * speedMult, 1.65 * speedMult), -6.1 * speedMult, 6.1 * speedMult);
+  const targetVx = clamp(swipeSpeed * 13.2 * speedMult * speedSkillScale, -5.8 * speedMult * speedSkillScale, 5.8 * speedMult * speedSkillScale);
+  const impulse = Math.sign(swipeSpeed) * Math.pow(Math.abs(swipeSpeed), 0.88) * 1.25 * speedMult * speedSkillScale;
+  state.player.vx = clamp((state.player.vx * 0.45) + (targetVx * 0.55) + clamp(impulse, -1.65 * speedMult * speedSkillScale, 1.65 * speedMult * speedSkillScale), -6.1 * speedMult * speedSkillScale, 6.1 * speedMult * speedSkillScale);
 }
 
 function clearTouchInput() {
@@ -1913,6 +1915,25 @@ function handleRunnerTap(pointX) {
   } else {
     state.runner.duckQueued = true;
   }
+}
+
+function updateTouchButtonLabels() {
+  if (!touchLeftBtnEl || !touchRightBtnEl) {
+    return;
+  }
+
+  if (state.mode === "runner") {
+    touchLeftBtnEl.innerHTML = "&#8593;";
+    touchRightBtnEl.innerHTML = "&#8595;";
+    touchLeftBtnEl.setAttribute("aria-label", "Hopp");
+    touchRightBtnEl.setAttribute("aria-label", "Dukk");
+    return;
+  }
+
+  touchLeftBtnEl.innerHTML = "&#8592;";
+  touchRightBtnEl.innerHTML = "&#8594;";
+  touchLeftBtnEl.setAttribute("aria-label", "Venstre");
+  touchRightBtnEl.setAttribute("aria-label", "Høyre");
 }
 
 window.addEventListener("keydown", (event) => {
@@ -2046,7 +2067,18 @@ function bindTouchPad(button, direction) {
   button.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     ensureMusic();
-    if (!state.running || state.mode !== "jumper" || state.controlMode !== "buttons") {
+    if (!state.running || state.controlMode !== "buttons") {
+      return;
+    }
+    if (state.mode === "runner") {
+      if (direction === "left") {
+        state.runner.jumpQueued = true;
+      } else {
+        state.runner.duckQueued = true;
+      }
+      return;
+    }
+    if (state.mode !== "jumper") {
       return;
     }
     setKeyboardInput(direction, true);
@@ -2109,7 +2141,9 @@ function updateTouchButtonsVisibility() {
     return;
   }
 
-  const shouldShow = isCoarsePointer && state.running && state.mode === "jumper" && state.controlMode === "buttons" && overlayEl.classList.contains("hidden") && (settingsPanelEl?.classList.contains("hidden") ?? true);
+  updateTouchButtonLabels();
+  const isPlayableMode = state.mode === "jumper" || state.mode === "runner";
+  const shouldShow = isCoarsePointer && state.running && isPlayableMode && state.controlMode === "buttons" && overlayEl.classList.contains("hidden") && (settingsPanelEl?.classList.contains("hidden") ?? true);
   if (shouldShow) {
     positionTouchButtons();
   }
