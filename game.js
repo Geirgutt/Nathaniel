@@ -1024,9 +1024,9 @@ function createObstacle() {
   return {
     type,
     x: width + rand(40, 90),
-    y: runnerGroundY - rand(4, 12),
-    w: rand(36, 58),
-    h: rand(24, 34)
+    y: runnerGroundY - rand(28, 34),
+    w: rand(40, 62),
+    h: rand(18, 24)
   };
 }
 
