@@ -36,6 +36,20 @@
       <button id="rightButton" class="control-button" type="button" aria-label="Gå til høyre">Høyre</button>
     </section>
 
+    <section class="scoreboard" aria-label="Toppliste">
+      <div class="scoreboard-head">
+        <div>
+          <p class="label">Kallenavn</p>
+          <input id="playerName" class="name-input" type="text" maxlength="16" placeholder="Skriv navn">
+        </div>
+        <button id="refreshScores" class="ghost-button" type="button">Oppdater</button>
+      </div>
+      <p id="scoreStatus" class="score-status">Topplisten lastes lokalt til Supabase er satt opp.</p>
+      <ol id="leaderboard" class="leaderboard-list">
+        <li>Ingen score enda.</li>
+      </ol>
+    </section>
+
     <section class="help">
       <p>Bruk A/D, piltaster eller touch-knappene nederst.</p>
       <p>Samle mynter på vei oppover for å låse opp neste level.</p>
@@ -50,6 +64,7 @@
     </div>
   </main>
 
+  <script src="config.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

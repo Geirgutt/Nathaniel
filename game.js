@@ -9,6 +9,10 @@ const messageEl = document.getElementById("message");
 const actionEl = document.getElementById("action");
 const leftButton = document.getElementById("leftButton");
 const rightButton = document.getElementById("rightButton");
+const playerNameEl = document.getElementById("playerName");
+const refreshScoresEl = document.getElementById("refreshScores");
+const scoreStatusEl = document.getElementById("scoreStatus");
+const leaderboardEl = document.getElementById("leaderboard");
 
 const width = canvas.width;
 const height = canvas.height;
@@ -18,7 +22,11 @@ const basePlatformWidth = 88;
 const platformHeight = 14;
 const basePlatformGap = 112;
 const bestScoreKey = "hopp-hoyest-best";
+const playerNameKey = "hopp-hoyest-player-name";
+const localLeaderboardKey = "hopp-hoyest-local-leaderboard";
 const coinsPerLevel = 12;
+const leaderboardLimit = 10;
+const supabaseConfig = window.SUPABASE_CONFIG || { url: "", anonKey: "", table: "scores" };
 
 const music = {
   context: null,
@@ -48,6 +56,7 @@ const state = {
   bestScore: Number(localStorage.getItem(bestScoreKey)) || 0,
   coins: 0,
   level: 1,
+  scoreSubmitted: false,
   keys: { left: false, right: false },
   player: null,
   platforms: [],
@@ -63,10 +72,140 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+function sanitizeName(name) {
+  return name.trim().replace(/\s+/g, " ").slice(0, 16);
+}
+
+function getPlayerName() {
+  return sanitizeName(playerNameEl.value || "");
+}
+
+function hasSupabaseConfig() {
+  return Boolean(supabaseConfig.url && supabaseConfig.anonKey && supabaseConfig.table);
+}
+
+function setScoreStatus(message) {
+  scoreStatusEl.textContent = message;
+}
+
+function renderLeaderboard(scores) {
+  if (!scores.length) {
+    leaderboardEl.innerHTML = "<li>Ingen score enda.</li>";
+    return;
+  }
+
+  leaderboardEl.innerHTML = scores
+    .map((entry) => `<li><strong>${entry.name}</strong> - ${entry.score} m (level ${entry.level})</li>`)
+    .join("");
+}
+
+function readLocalLeaderboard() {
+  try {
+    return JSON.parse(localStorage.getItem(localLeaderboardKey)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalLeaderboard(scores) {
+  localStorage.setItem(localLeaderboardKey, JSON.stringify(scores.slice(0, leaderboardLimit)));
+}
+
+async function fetchLeaderboard() {
+  if (!hasSupabaseConfig()) {
+    renderLeaderboard(readLocalLeaderboard());
+    setScoreStatus("Fyll inn Supabase i config.js for delt toppliste. Viser lokal liste forelopig.");
+    return;
+  }
+
+  setScoreStatus("Henter toppliste...");
+
+  try {
+    const params = new URLSearchParams({
+      select: "name,score,level,created_at",
+      order: "score.desc,created_at.asc",
+      limit: String(leaderboardLimit)
+    });
+
+    const response = await fetch(`${supabaseConfig.url}/rest/v1/${supabaseConfig.table}?${params.toString()}`, {
+      headers: {
+        apikey: supabaseConfig.anonKey,
+        Authorization: `Bearer ${supabaseConfig.anonKey}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Leaderboard-feil: ${response.status}`);
+    }
+
+    const scores = await response.json();
+    renderLeaderboard(scores);
+    setScoreStatus("Delt toppliste er aktiv.");
+  } catch {
+    renderLeaderboard(readLocalLeaderboard());
+    setScoreStatus("Kunne ikke hente Supabase-toppliste. Viser lokal liste.");
+  }
+}
+
+async function submitScore() {
+  if (state.scoreSubmitted) {
+    return;
+  }
+
+  const name = getPlayerName();
+  if (!name) {
+    setScoreStatus("Skriv inn et kallenavn for a lagre score.");
+    return;
+  }
+
+  const entry = {
+    name,
+    score: Math.floor(state.heightScore),
+    level: state.level
+  };
+
+  state.scoreSubmitted = true;
+
+  if (!hasSupabaseConfig()) {
+    const scores = [entry, ...readLocalLeaderboard()]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, leaderboardLimit);
+    writeLocalLeaderboard(scores);
+    renderLeaderboard(scores);
+    setScoreStatus("Score lagret lokalt. Sett opp Supabase for delt toppliste.");
+    return;
+  }
+
+  setScoreStatus("Lagrer score...");
+
+  try {
+    const response = await fetch(`${supabaseConfig.url}/rest/v1/${supabaseConfig.table}`, {
+      method: "POST",
+      headers: {
+        apikey: supabaseConfig.anonKey,
+        Authorization: `Bearer ${supabaseConfig.anonKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal"
+      },
+      body: JSON.stringify(entry)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Lagringsfeil: ${response.status}`);
+    }
+
+    setScoreStatus("Score lagret i delt toppliste.");
+    await fetchLeaderboard();
+  } catch {
+    state.scoreSubmitted = false;
+    setScoreStatus("Kunne ikke lagre score til Supabase.");
+  }
+}
+
 function getRunDifficulty() {
-  const heightFactor = Math.min(1, state.heightScore / 220);
-  const levelFactor = Math.min(1, (state.level - 1) / 5);
-  return clamp(heightFactor * 0.7 + levelFactor * 0.5, 0, 1.2);
+  const heightFactor = Math.min(1.2, state.heightScore / 120);
+  const levelFactor = Math.min(1.1, (state.level - 1) / 3);
+  return clamp(0.18 + heightFactor * 0.85 + levelFactor * 0.6, 0, 1.45);
 }
 
 function setOverlay(title, buttonText, show = true) {
@@ -141,7 +280,7 @@ function updateMusic() {
   }
 
   const lookAhead = 0.18;
-  const intensity = Math.min(1, (state.heightScore / 150) + (state.level - 1) * 0.08);
+  const intensity = Math.min(1, 0.15 + (state.heightScore / 120) + (state.level - 1) * 0.1);
   const beatLength = state.running ? 0.24 - intensity * 0.05 : 0.29;
 
   music.master.gain.setTargetAtTime(state.running ? 0.19 : 0.1, music.context.currentTime, 0.08);
@@ -164,17 +303,17 @@ function updateMusic() {
 
 function getPlatformWidth() {
   const difficulty = getRunDifficulty();
-  return Math.max(48, basePlatformWidth - state.level * 2 - difficulty * 18);
+  return Math.max(44, basePlatformWidth - state.level * 3 - difficulty * 22);
 }
 
 function getPlatformGap() {
   const difficulty = getRunDifficulty();
-  return Math.min(138, basePlatformGap + state.level * 3 + difficulty * 16);
+  return Math.min(146, basePlatformGap + state.level * 4 + difficulty * 20);
 }
 
 function getJumpVelocity() {
   const difficulty = getRunDifficulty();
-  return baseJumpVelocity - Math.min(0.8, (state.level - 1) * 0.06) - difficulty * 0.45;
+  return baseJumpVelocity - Math.min(1.0, (state.level - 1) * 0.08) - difficulty * 0.55;
 }
 
 function getGravity(vy) {
@@ -216,8 +355,8 @@ function maybeCreateCollectible(platform) {
 function createPlatform(y, guaranteedCenter = false, previousPlatform = null) {
   const platformWidth = getPlatformWidth();
   const difficulty = getRunDifficulty();
-  const movingChance = guaranteedCenter ? 0 : clamp((difficulty - 0.35) * 0.45, 0, 0.35);
-  const maxOffset = 78 + difficulty * 26;
+  const movingChance = guaranteedCenter ? 0 : clamp((difficulty - 0.15) * 0.5, 0, 0.45);
+  const maxOffset = 72 + difficulty * 34;
 
   let x;
   if (guaranteedCenter || !previousPlatform) {
@@ -258,6 +397,7 @@ function resetGame() {
   state.heightScore = 0;
   state.coins = 0;
   state.level = 1;
+  state.scoreSubmitted = false;
   state.platforms = [];
   state.collectibles = [];
   state.floatingTexts = [];
@@ -340,11 +480,17 @@ function updateFloatingTexts() {
   });
 }
 
+function finishRun() {
+  state.running = false;
+  setOverlay(`Du kom til level ${state.level} og nadde ${Math.floor(state.heightScore)} meter.`, "Prov igjen");
+  submitScore();
+}
+
 function updatePlayer() {
   const player = state.player;
   const difficulty = getRunDifficulty();
-  const airAcceleration = 0.34 + difficulty * 0.05;
-  const maxMoveSpeed = moveSpeed + difficulty * 0.35;
+  const airAcceleration = 0.35 + difficulty * 0.07;
+  const maxMoveSpeed = moveSpeed + difficulty * 0.5;
 
   if (state.keys.left) {
     player.vx = Math.max(player.vx - airAcceleration, -maxMoveSpeed);
@@ -394,8 +540,7 @@ function updatePlayer() {
   }
 
   if (player.y - state.cameraY > height + 140) {
-    state.running = false;
-    setOverlay(`Du kom til level ${state.level} og nådde ${Math.floor(state.heightScore)} meter.`, "Prøv igjen");
+    finishRun();
   }
 }
 
@@ -573,7 +718,19 @@ actionEl.addEventListener("click", startGame);
 attachHoldControl(leftButton, "left");
 attachHoldControl(rightButton, "right");
 
+playerNameEl.value = localStorage.getItem(playerNameKey) || "";
+playerNameEl.addEventListener("input", () => {
+  const cleanName = sanitizeName(playerNameEl.value);
+  if (playerNameEl.value !== cleanName) {
+    playerNameEl.value = cleanName;
+  }
+  localStorage.setItem(playerNameKey, cleanName);
+});
+
+refreshScoresEl.addEventListener("click", fetchLeaderboard);
+
 resetGame();
-setOverlay("Trykk på start og hopp så høyt du kan. Samle 12 mynter for neste level.", "Start spill");
+setOverlay("Trykk pa start og hopp sa hoyt du kan. Samle 12 mynter for neste level.", "Start spill");
 updateHud();
+fetchLeaderboard();
 loop();
