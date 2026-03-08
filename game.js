@@ -1183,8 +1183,10 @@ function updateJumperPlayer() {
 
   if (Math.abs(moveIntent) > 0.04) {
     player.vx += moveIntent * airAcceleration;
+  } else if (!state.touch.active) {
+    player.vx *= 0.82;
   } else {
-    player.vx *= 0.84;
+    player.vx *= 0.92;
   }
 
   if (isJetpackActive()) {
@@ -1728,12 +1730,15 @@ function applyTouchSwipe(x, timeStamp) {
   state.touch.lastX = x;
   state.touch.lastTime = timeStamp;
 
-  if (Math.abs(dx) < 2 || !state.player) {
+  if (Math.abs(dx) < 1 || !state.player) {
     return;
   }
 
-  const impulse = clamp((dx / dt) * 1.25, -1.85, 1.85);
-  state.player.vx += impulse + Math.sign(impulse) * 0.06;
+  const directMove = clamp(dx * 1.18, -20, 20);
+  const impulse = clamp((dx / dt) * 0.9, -1.35, 1.35);
+
+  state.player.x += directMove;
+  state.player.vx = clamp((state.player.vx * 0.38) + impulse, -4.2, 4.2);
 }
 
 function clearTouchInput() {
@@ -1905,6 +1910,7 @@ updateHud();
 renderShop();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
 
 
 
