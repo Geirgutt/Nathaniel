@@ -2,7 +2,9 @@
 <html lang="no">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>Hopp Høyest</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -29,8 +31,13 @@
 
     <canvas id="game" width="420" height="720" aria-label="Spillflate"></canvas>
 
+    <section class="controls" aria-label="Touch-kontroller">
+      <button id="leftButton" class="control-button" type="button" aria-label="Gå til venstre">Venstre</button>
+      <button id="rightButton" class="control-button" type="button" aria-label="Gå til høyre">Høyre</button>
+    </section>
+
     <section class="help">
-      <p>Bruk A/D eller piltaster for å styre i lufta.</p>
+      <p>Bruk A/D, piltaster eller touch-knappene nederst.</p>
       <p>Samle mynter på vei oppover for å låse opp neste level.</p>
     </section>
 

@@ -7,6 +7,8 @@ const bestEl = document.getElementById("best");
 const overlayEl = document.getElementById("overlay");
 const messageEl = document.getElementById("message");
 const actionEl = document.getElementById("action");
+const leftButton = document.getElementById("leftButton");
+const rightButton = document.getElementById("rightButton");
 
 const width = canvas.width;
 const height = canvas.height;
@@ -505,39 +507,73 @@ function startGame() {
   state.player.vy = getJumpVelocity();
 }
 
+function setDirectionalInput(direction, isPressed) {
+  state.keys[direction] = isPressed;
+  const button = direction === "left" ? leftButton : rightButton;
+  button.classList.toggle("is-pressed", isPressed);
+}
+
+function attachHoldControl(button, direction) {
+  const release = () => setDirectionalInput(direction, false);
+
+  button.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    ensureMusic();
+    setDirectionalInput(direction, true);
+  });
+
+  button.addEventListener("pointerup", release);
+  button.addEventListener("pointercancel", release);
+  button.addEventListener("pointerleave", release);
+  button.addEventListener("lostpointercapture", release);
+}
+
 window.addEventListener("keydown", (event) => {
+  if (["ArrowLeft", "ArrowRight", " ", "Spacebar", "Enter"].includes(event.key)) {
+    event.preventDefault();
+  }
+
   ensureMusic();
 
   if (event.key === "ArrowLeft" || event.key.toLowerCase() === "a") {
-    state.keys.left = true;
+    setDirectionalInput("left", true);
   }
   if (event.key === "ArrowRight" || event.key.toLowerCase() === "d") {
-    state.keys.right = true;
+    setDirectionalInput("right", true);
   }
-  if (!state.running && (event.key === " " || event.key === "Enter")) {
+  if (!state.running && (event.key === " " || event.key === "Spacebar" || event.key === "Enter")) {
     startGame();
   }
 });
 
 window.addEventListener("keyup", (event) => {
   if (event.key === "ArrowLeft" || event.key.toLowerCase() === "a") {
-    state.keys.left = false;
+    setDirectionalInput("left", false);
   }
   if (event.key === "ArrowRight" || event.key.toLowerCase() === "d") {
-    state.keys.right = false;
+    setDirectionalInput("right", false);
   }
 });
 
-actionEl.addEventListener("click", startGame);
-canvas.addEventListener("click", () => {
+for (const element of [document.body, canvas, leftButton, rightButton, overlayEl]) {
+  element.addEventListener("touchmove", (event) => {
+    event.preventDefault();
+  }, { passive: false });
+}
+
+canvas.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
   ensureMusic();
   if (!state.running) {
     startGame();
   }
 });
 
+actionEl.addEventListener("click", startGame);
+attachHoldControl(leftButton, "left");
+attachHoldControl(rightButton, "right");
+
 resetGame();
 setOverlay("Trykk på start og hopp så høyt du kan. Samle 12 mynter for neste level.", "Start spill");
 updateHud();
 loop();
-
