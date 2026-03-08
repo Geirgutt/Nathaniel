@@ -1198,6 +1198,7 @@ function updateJumperPlayer() {
   const moveIntent = getMoveIntent();
   const airAcceleration = 0.36 + difficulty * 0.08 + (isSpeedSkillActive() ? 0.11 : 0) + (isBananaActive() ? 0.06 : 0);
   const maxMoveSpeed = moveSpeed + difficulty * 0.62 + (isSpeedSkillActive() ? 1.15 : 0) + (isBananaActive() ? 0.45 : 0);
+  const touchSpeedCap = state.touch.active && isCoarsePointer ? maxMoveSpeed * 1.24 : maxMoveSpeed;
 
   player.bounceSquash *= 0.84;
 
@@ -1216,7 +1217,7 @@ function updateJumperPlayer() {
   }
 
   player.vy += getGravity(player.vy);
-  player.vx = clamp(player.vx, -maxMoveSpeed, maxMoveSpeed);
+  player.vx = clamp(player.vx, -touchSpeedCap, touchSpeedCap);
   player.x += player.vx;
   player.y += player.vy;
 
@@ -1753,8 +1754,8 @@ function applyTouchSwipe(x, timeStamp) {
   }
 
   const swipeSpeed = dx / dt;
-  const impulse = Math.sign(swipeSpeed) * Math.pow(Math.abs(swipeSpeed), 0.92) * 1.55;
-  state.player.vx = clamp(state.player.vx + clamp(impulse, -1.75, 1.75), -4.4, 4.4);
+  const impulse = Math.sign(swipeSpeed) * Math.pow(Math.abs(swipeSpeed), 0.9) * 2.05;
+  state.player.vx = clamp(state.player.vx + clamp(impulse, -2.35, 2.35), -5.4, 5.4);
 }
 
 function clearTouchInput() {
@@ -1915,6 +1916,9 @@ updateHud();
 renderShop();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
+
 
 
 
