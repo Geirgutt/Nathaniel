@@ -41,7 +41,9 @@ body {
 }
 
 .hud,
-.help {
+.help,
+.profile-bar,
+.shop-title-row {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -51,14 +53,17 @@ body {
   flex-wrap: wrap;
 }
 
-.hud > div {
+.hud > div,
+.profile-bar > div {
   min-width: 74px;
 }
 
 .label,
 .value,
 .help p,
-.score-status {
+.score-status,
+.shop-hint,
+.shop-title-row h2 {
   margin: 0;
 }
 
@@ -72,6 +77,14 @@ body {
 .value {
   font-size: 1.35rem;
   font-weight: 700;
+}
+
+.small-value {
+  font-size: 1.15rem;
+}
+
+.mini-value {
+  font-size: 1rem;
 }
 
 #game {
@@ -105,13 +118,13 @@ body {
 }
 
 .panel {
-  width: min(100%, 340px);
-  max-height: calc(100vh - 48px);
+  width: min(100%, 360px);
+  max-height: calc(100vh - 40px);
   overflow: auto;
-  padding: 24px;
+  padding: 22px;
   text-align: center;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 10px 40px rgba(10, 26, 44, 0.18);
 }
 
@@ -124,6 +137,7 @@ body {
   margin: 0 0 18px;
 }
 
+button,
 .ghost-button,
 .panel button {
   border: 0;
@@ -140,6 +154,14 @@ body {
   color: white;
   background: linear-gradient(135deg, #ff8c42, #ff5f6d);
   cursor: pointer;
+}
+
+.profile-bar {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  text-align: left;
+  background: rgba(23, 50, 77, 0.08);
 }
 
 .score-entry {
@@ -164,7 +186,7 @@ body {
 
 .ghost-button {
   min-height: 42px;
-  padding: 0 14px;
+  padding: 10px 14px;
   border-radius: 12px;
   color: #17324d;
   background: rgba(23, 50, 77, 0.08);
@@ -175,17 +197,83 @@ body {
   margin-top: 10px;
 }
 
-.scoreboard {
+.scoreboard,
+.shop-section {
   margin-bottom: 14px;
   padding: 14px;
   border-radius: 18px;
   text-align: left;
-  background: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.72);
 }
 
-.score-status {
+.score-status,
+.shop-hint {
   font-size: 0.9rem;
   color: rgba(23, 50, 77, 0.74);
+}
+
+.shop {
+  margin-bottom: 14px;
+}
+
+.shop-title-row {
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.shop-title-row h2 {
+  font-size: 1.1rem;
+}
+
+.shop-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.shop-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(23, 50, 77, 0.06);
+}
+
+.shop-card strong,
+.shop-card p {
+  margin: 0;
+}
+
+.shop-card p {
+  font-size: 0.88rem;
+  color: rgba(23, 50, 77, 0.72);
+}
+
+.shop-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.84rem;
+  color: rgba(23, 50, 77, 0.76);
+}
+
+.shop-button {
+  min-width: 86px;
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  color: white;
+  background: linear-gradient(135deg, #17324d, #2e5d88);
+}
+
+.shop-button.owned,
+.shop-button.selected {
+  background: linear-gradient(135deg, #1f7a4d, #3ea86a);
+}
+
+.shop-button.locked {
+  background: linear-gradient(135deg, #847577, #9e8f91);
 }
 
 .leaderboard-list {

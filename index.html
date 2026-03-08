@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <title>Hopp Høyest</title>
-  <link rel="stylesheet" href="style.css?v=20260308-3">
+  <link rel="stylesheet" href="style.css?v=20260308-4">
 </head>
 <body>
   <main class="game-shell">
@@ -17,7 +17,7 @@
       </div>
       <div>
         <p class="label">Mynter</p>
-        <p id="coins" class="value">0</p>
+        <p id="coins" class="value">0 / 12</p>
       </div>
       <div>
         <p class="label">Level</p>
@@ -41,6 +41,21 @@
         <h1>Hopp Høyest</h1>
         <p id="message">Trykk for å starte.</p>
 
+        <section class="profile-bar">
+          <div>
+            <p class="label">Coin Bank</p>
+            <p id="coinBank" class="value small-value">0</p>
+          </div>
+          <div>
+            <p class="label">Map</p>
+            <p id="selectedMapName" class="value mini-value">Sky Park</p>
+          </div>
+          <div>
+            <p class="label">Skill</p>
+            <p id="selectedSkillName" class="value mini-value">Ingen</p>
+          </div>
+        </section>
+
         <section id="scoreEntry" class="score-entry hidden">
           <label class="label" for="playerName">Kallenavn</label>
           <input id="playerName" class="name-input" type="text" maxlength="16" placeholder="Skriv navn">
@@ -54,12 +69,38 @@
           </ol>
         </section>
 
+        <section id="shopPanel" class="shop" aria-label="Butikk og unlocks">
+          <div class="shop-section">
+            <div class="shop-title-row">
+              <h2>Skins</h2>
+              <p class="shop-hint">Velg stil for figuren.</p>
+            </div>
+            <div id="skinsShop" class="shop-grid"></div>
+          </div>
+
+          <div class="shop-section">
+            <div class="shop-title-row">
+              <h2>Maps</h2>
+              <p class="shop-hint">Ny bakgrunn og ny musikk.</p>
+            </div>
+            <div id="mapsShop" class="shop-grid"></div>
+          </div>
+
+          <div class="shop-section">
+            <div class="shop-title-row">
+              <h2>Skills</h2>
+              <p class="shop-hint">Velg en skill per runde.</p>
+            </div>
+            <div id="skillsShop" class="shop-grid"></div>
+          </div>
+        </section>
+
         <button id="action" type="button">Start spill</button>
       </div>
     </div>
   </main>
 
-  <script src="config.js?v=20260308-3"></script>
-  <script src="game.js?v=20260308-3"></script>
+  <script src="config.js?v=20260308-4"></script>
+  <script src="game.js?v=20260308-4"></script>
 </body>
 </html>

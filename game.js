@@ -1,4 +1,4 @@
-ï»¿const canvas = document.getElementById("game");
+const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true }) || canvas.getContext("2d");
 const scoreEl = document.getElementById("score");
 const coinsEl = document.getElementById("coins");
@@ -13,6 +13,12 @@ const scoreEntryEl = document.getElementById("scoreEntry");
 const scoreStatusEl = document.getElementById("scoreStatus");
 const leaderboardEl = document.getElementById("leaderboard");
 const leaderboardPanelEl = document.getElementById("leaderboardPanel");
+const coinBankEl = document.getElementById("coinBank");
+const selectedMapNameEl = document.getElementById("selectedMapName");
+const selectedSkillNameEl = document.getElementById("selectedSkillName");
+const skinsShopEl = document.getElementById("skinsShop");
+const mapsShopEl = document.getElementById("mapsShop");
+const skillsShopEl = document.getElementById("skillsShop");
 
 const width = canvas.width;
 const height = canvas.height;
@@ -31,14 +37,149 @@ const runnerGroundY = height - 118;
 const bestScoreKey = "hopp-hoyest-best";
 const playerNameKey = "hopp-hoyest-player-name";
 const localLeaderboardKey = "hopp-hoyest-local-leaderboard";
+const progressionKey = "hopp-hoyest-progression-v1";
 const coinsPerLevel = 12;
 const leaderboardLimit = 10;
 const discoDurationMs = 8000;
 const jetpackDurationMs = 900;
 const runnerDashDurationMs = 380;
 const supabaseConfig = window.SUPABASE_CONFIG || { url: "", publishableKey: "", table: "scores" };
-const isCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
 const lowFxMode = isCoarsePointer;
+
+const skins = {
+  starter: {
+    id: "starter",
+    name: "Sky Kid",
+    description: "Klassisk helt med rød kappe.",
+    cost: 0,
+    colors: { body: "#1f3c88", cape: "#ff5f6d", visor: "#7dd3fc", accent: "#0f172a" }
+  },
+  robot: {
+    id: "robot",
+    name: "Turbo Bot",
+    description: "Blank robot med neonblikk.",
+    cost: 40,
+    colors: { body: "#7c8aa5", cape: "#00d1ff", visor: "#caf0f8", accent: "#102235" }
+  },
+  melon: {
+    id: "melon",
+    name: "Melon Mage",
+    description: "En hoppende vannmelon med attitude.",
+    cost: 70,
+    colors: { body: "#39a845", cape: "#ff4d6d", visor: "#ffe066", accent: "#1b4332" }
+  },
+  toast: {
+    id: "toast",
+    name: "Toast Rocket",
+    description: "Frokost med fartstriper.",
+    cost: 95,
+    colors: { body: "#c08457", cape: "#ff9f1c", visor: "#fff0c2", accent: "#6b3e26" }
+  }
+};
+
+const maps = {
+  sky: {
+    id: "sky",
+    name: "Sky Park",
+    description: "Luftig daghimmel og lett synth.",
+    cost: 0,
+    theme: {
+      bodyBackground: "radial-gradient(circle at top, rgba(255, 245, 180, 0.75), transparent 30%), linear-gradient(180deg, #87ceeb 0%, #dff5ff 48%, #f7f7ef 100%)",
+      top: "#8ad8ff",
+      mid: "#dbf4ff",
+      bottom: "#fff2c2",
+      cloud: "rgba(255,255,255,0.68)",
+      runnerTop: "#0f172a",
+      runnerMid: "#1d3557",
+      runnerBottom: "#2d6a4f"
+    },
+    musicSequence: [
+      { bass: 110.0, lead: 659.25, pulse: true },
+      { bass: 146.83, lead: 783.99, pulse: false },
+      { bass: 123.47, lead: 698.46, pulse: true },
+      { bass: 164.81, lead: 880.0, pulse: true }
+    ]
+  },
+  sunset: {
+    id: "sunset",
+    name: "Sunset Strip",
+    description: "Oransje skyline og mer driv i beaten.",
+    cost: 80,
+    theme: {
+      bodyBackground: "radial-gradient(circle at top, rgba(255, 207, 123, 0.78), transparent 30%), linear-gradient(180deg, #ff9a5a 0%, #ffcf99 45%, #5e4b8b 100%)",
+      top: "#ff955c",
+      mid: "#ffd1a6",
+      bottom: "#6f5aa7",
+      cloud: "rgba(255,236,209,0.44)",
+      runnerTop: "#2b124c",
+      runnerMid: "#522258",
+      runnerBottom: "#c4483d"
+    },
+    musicSequence: [
+      { bass: 98.0, lead: 587.33, pulse: true },
+      { bass: 130.81, lead: 659.25, pulse: true },
+      { bass: 146.83, lead: 783.99, pulse: false },
+      { bass: 174.61, lead: 880.0, pulse: true }
+    ]
+  },
+  frost: {
+    id: "frost",
+    name: "Frost Byte",
+    description: "Kald neon-is og skarpere toner.",
+    cost: 130,
+    theme: {
+      bodyBackground: "radial-gradient(circle at top, rgba(170, 240, 255, 0.6), transparent 32%), linear-gradient(180deg, #8ed8ff 0%, #d9e6ff 46%, #cfe8ff 100%)",
+      top: "#7ed7ff",
+      mid: "#dce8ff",
+      bottom: "#b9d2ff",
+      cloud: "rgba(238,249,255,0.55)",
+      runnerTop: "#081c3a",
+      runnerMid: "#1d4e89",
+      runnerBottom: "#4da8da"
+    },
+    musicSequence: [
+      { bass: 123.47, lead: 698.46, pulse: false },
+      { bass: 146.83, lead: 880.0, pulse: true },
+      { bass: 164.81, lead: 987.77, pulse: true },
+      { bass: 196.0, lead: 1174.66, pulse: false }
+    ]
+  }
+};
+
+const skills = {
+  none: {
+    id: "none",
+    name: "Ingen",
+    description: "Spill rent og enkelt.",
+    cost: 0
+  },
+  extra_life: {
+    id: "extra_life",
+    name: "Ekstraliv",
+    description: "Redder deg fra ett stygt fall.",
+    cost: 60
+  },
+  frog_hop: {
+    id: "frog_hop",
+    name: "Froskehopp",
+    description: "Hopp ekstra hardt i starten av runden.",
+    cost: 85
+  },
+  superspeed: {
+    id: "superspeed",
+    name: "Superspeed",
+    description: "Kvassere styring og høyere toppfart en stund.",
+    cost: 95
+  },
+  banana: {
+    id: "banana",
+    name: "Mystisk banan",
+    description: "Ingen vet hva den egentlig gjør. Lases opp ved 5000 m.",
+    cost: 0,
+    unlockScore: 5000
+  }
+};
 
 const music = {
   context: null,
@@ -49,16 +190,6 @@ const music = {
   active: false,
   nextNoteTime: 0,
   step: 0,
-  sequence: [
-    { bass: 110.0, lead: 659.25, pulse: true },
-    { bass: 146.83, lead: 783.99, pulse: false },
-    { bass: 123.47, lead: 698.46, pulse: true },
-    { bass: 164.81, lead: 880.0, pulse: true },
-    { bass: 110.0, lead: 587.33, pulse: false },
-    { bass: 146.83, lead: 783.99, pulse: true },
-    { bass: 123.47, lead: 698.46, pulse: false },
-    { bass: 174.61, lead: 987.77, pulse: true }
-  ],
   discoSequence: [
     { bass: 130.81, lead: 783.99, pulse: true },
     { bass: 164.81, lead: 1046.5, pulse: true },
@@ -73,6 +204,17 @@ const music = {
   ]
 };
 
+const defaultProgression = {
+  bankCoins: 0,
+  ownedSkins: ["starter"],
+  selectedSkin: "starter",
+  ownedMaps: ["sky"],
+  selectedMap: "sky",
+  ownedSkills: ["none"],
+  selectedSkill: "none",
+  unlockedBanana: false
+};
+
 const state = {
   running: false,
   mode: "jumper",
@@ -83,7 +225,9 @@ const state = {
   level: 1,
   scoreSubmitted: false,
   leaderboard: [],
+  progression: null,
   keys: { left: false, right: false },
+  touch: { active: false, pointerId: null, startX: 0, axis: 0 },
   player: null,
   platforms: [],
   collectibles: [],
@@ -93,7 +237,16 @@ const state = {
   elapsedMs: 0,
   effects: {
     discoUntil: 0,
-    jetpackUntil: 0
+    jetpackUntil: 0,
+    bananaUntil: 0
+  },
+  skillState: {
+    selected: "none",
+    extraLifeUsed: false,
+    frogUntil: 0,
+    speedUntil: 0,
+    bananaTriggered: false,
+    bananaPulseUntil: 0
   },
   runner: {
     triggered: false,
@@ -136,9 +289,200 @@ function setScoreStatus(message) {
   scoreStatusEl.textContent = message;
 }
 
-function setControlMode() {
+function cloneDefaultProgression() {
+  return {
+    bankCoins: defaultProgression.bankCoins,
+    ownedSkins: [...defaultProgression.ownedSkins],
+    selectedSkin: defaultProgression.selectedSkin,
+    ownedMaps: [...defaultProgression.ownedMaps],
+    selectedMap: defaultProgression.selectedMap,
+    ownedSkills: [...defaultProgression.ownedSkills],
+    selectedSkill: defaultProgression.selectedSkill,
+    unlockedBanana: defaultProgression.unlockedBanana
+  };
 }
 
+function uniqueList(items) {
+  return [...new Set(items)];
+}
+
+function loadProgression() {
+  let loaded = {};
+  try {
+    loaded = JSON.parse(localStorage.getItem(progressionKey)) || {};
+  } catch {
+    loaded = {};
+  }
+
+  const progression = {
+    ...cloneDefaultProgression(),
+    ...loaded,
+    ownedSkins: uniqueList([...(loaded.ownedSkins || defaultProgression.ownedSkins)]).filter((id) => skins[id]),
+    ownedMaps: uniqueList([...(loaded.ownedMaps || defaultProgression.ownedMaps)]).filter((id) => maps[id]),
+    ownedSkills: uniqueList([...(loaded.ownedSkills || defaultProgression.ownedSkills)]).filter((id) => skills[id])
+  };
+
+  if (!progression.ownedSkins.includes("starter")) progression.ownedSkins.unshift("starter");
+  if (!progression.ownedMaps.includes("sky")) progression.ownedMaps.unshift("sky");
+  if (!progression.ownedSkills.includes("none")) progression.ownedSkills.unshift("none");
+  if (!skins[progression.selectedSkin]) progression.selectedSkin = "starter";
+  if (!maps[progression.selectedMap]) progression.selectedMap = "sky";
+  if (!skills[progression.selectedSkill]) progression.selectedSkill = "none";
+  if (!progression.ownedSkins.includes(progression.selectedSkin)) progression.selectedSkin = progression.ownedSkins[0];
+  if (!progression.ownedMaps.includes(progression.selectedMap)) progression.selectedMap = progression.ownedMaps[0];
+  if (!progression.ownedSkills.includes(progression.selectedSkill)) progression.selectedSkill = progression.ownedSkills[0];
+  progression.bankCoins = Math.max(0, Number(progression.bankCoins) || 0);
+  progression.unlockedBanana = Boolean(progression.unlockedBanana);
+  return progression;
+}
+
+function saveProgression() {
+  localStorage.setItem(progressionKey, JSON.stringify(state.progression));
+}
+
+function getSelectedSkin() {
+  return skins[state.progression.selectedSkin] || skins.starter;
+}
+
+function getSelectedMap() {
+  return maps[state.progression.selectedMap] || maps.sky;
+}
+
+function getSelectedSkill() {
+  return skills[state.progression.selectedSkill] || skills.none;
+}
+
+function owns(kind, id) {
+  const key = kind === "skin" ? "ownedSkins" : kind === "map" ? "ownedMaps" : "ownedSkills";
+  return state.progression[key].includes(id);
+}
+
+function canAfford(cost) {
+  return state.progression.bankCoins >= cost;
+}
+
+function updateProfileBar() {
+  coinBankEl.textContent = `${state.progression.bankCoins}`;
+  selectedMapNameEl.textContent = getSelectedMap().name;
+  selectedSkillNameEl.textContent = getSelectedSkill().name;
+}
+
+function applyBodyTheme() {
+  document.body.style.background = getSelectedMap().theme.bodyBackground;
+}
+function renderShopCards(container, items, kind) {
+  container.innerHTML = Object.values(items).map((item) => {
+    const ownedItem = owns(kind, item.id);
+    const selected = (kind === "skin" && state.progression.selectedSkin === item.id) ||
+      (kind === "map" && state.progression.selectedMap === item.id) ||
+      (kind === "skill" && state.progression.selectedSkill === item.id);
+    const lockedByScore = Boolean(item.unlockScore && state.bestScore < item.unlockScore && !ownedItem);
+
+    let label = "Kjop";
+    let extraClass = "";
+    if (selected) {
+      label = "Valgt";
+      extraClass = "selected";
+    } else if (ownedItem) {
+      label = "Velg";
+      extraClass = "owned";
+    } else if (lockedByScore) {
+      label = `${item.unlockScore} m`;
+      extraClass = "locked";
+    } else {
+      label = item.cost > 0 ? `${item.cost} coins` : "Gratis";
+    }
+
+    return `
+      <article class="shop-card">
+        <div>
+          <strong>${item.name}</strong>
+          <p>${item.description}</p>
+          <div class="shop-meta">
+            <span>${ownedItem ? "Eid" : lockedByScore ? "Lases opp senere" : `Pris: ${item.cost}`}</span>
+          </div>
+        </div>
+        <button
+          class="shop-button ${extraClass}"
+          type="button"
+          data-kind="${kind}"
+          data-id="${item.id}"
+          ${selected ? "disabled" : ""}
+          ${lockedByScore ? "disabled" : ""}
+        >${label}</button>
+      </article>`;
+  }).join("");
+}
+
+function renderShop() {
+  renderShopCards(skinsShopEl, skins, "skin");
+  renderShopCards(mapsShopEl, maps, "map");
+  renderShopCards(skillsShopEl, skills, "skill");
+  updateProfileBar();
+}
+
+function spendCoins(cost) {
+  state.progression.bankCoins = Math.max(0, state.progression.bankCoins - cost);
+  saveProgression();
+  updateProfileBar();
+}
+
+function selectOwned(kind, id) {
+  if (kind === "skin") {
+    state.progression.selectedSkin = id;
+  } else if (kind === "map") {
+    state.progression.selectedMap = id;
+    applyBodyTheme();
+  } else {
+    state.progression.selectedSkill = id;
+  }
+  saveProgression();
+  renderShop();
+}
+
+function purchase(kind, id) {
+  const collection = kind === "skin" ? skins : kind === "map" ? maps : skills;
+  const item = collection[id];
+  if (!item) {
+    return;
+  }
+
+  if (owns(kind, id)) {
+    selectOwned(kind, id);
+    return;
+  }
+
+  if (item.unlockScore && state.bestScore < item.unlockScore) {
+    addFloatingText(`${item.unlockScore} m kreves`, width / 2, state.cameraY + 220, "#ff6b6b", 60);
+    return;
+  }
+
+  if (!canAfford(item.cost)) {
+    addFloatingText("Flere coins trengs", width / 2, state.cameraY + 220, "#ff6b6b", 60);
+    return;
+  }
+
+  spendCoins(item.cost);
+  const key = kind === "skin" ? "ownedSkins" : kind === "map" ? "ownedMaps" : "ownedSkills";
+  state.progression[key].push(id);
+  state.progression[key] = uniqueList(state.progression[key]);
+  selectOwned(kind, id);
+}
+
+function unlockBananaIfNeeded(score) {
+  if (state.progression.unlockedBanana || score < 5000) {
+    return false;
+  }
+
+  state.progression.unlockedBanana = true;
+  state.progression.ownedSkills.push("banana");
+  state.progression.ownedSkills = uniqueList(state.progression.ownedSkills);
+  saveProgression();
+  renderShop();
+  updateProfileBar();
+  addFloatingText("MYSTISK BANAN LASES OPP!", width / 2, state.cameraY + 180, "#ffe066", 90);
+  return true;
+}
 
 function renderLeaderboard(scores) {
   state.leaderboard = scores;
@@ -256,6 +600,7 @@ async function submitScore() {
     renderLeaderboard(scores);
     setScoreStatus("Score lagret lokalt.");
     scoreEntryEl.classList.add("hidden");
+    renderShop();
     return;
   }
 
@@ -298,7 +643,8 @@ function showStartOverlay() {
   scoreEntryEl.classList.add("hidden");
   leaderboardPanelEl.classList.add("hidden");
   saveScoreEl.disabled = false;
-  setOverlay("Trykk pa start og hopp sa hoyt du kan. Portal run venter ved 2000 meter.", "Start spill", true);
+  renderShop();
+  setOverlay("Start rolig, samle coins og bygg opp banken din. Portal-run venter ved 2000 meter.", "Start spill", true);
 }
 
 async function showGameOverOverlay() {
@@ -306,6 +652,8 @@ async function showGameOverOverlay() {
   scoreEntryEl.classList.add("hidden");
   leaderboardPanelEl.classList.remove("hidden");
   saveScoreEl.disabled = false;
+  unlockBananaIfNeeded(score);
+  renderShop();
 
   const scores = await fetchLeaderboard();
   const qualifies = qualifiesForLeaderboard(score);
@@ -317,9 +665,8 @@ async function showGameOverOverlay() {
     setScoreStatus("Ikke top 10 denne gangen, men her er lista.");
   }
 
-  setOverlay(`Du kom til level ${state.level} og nadde ${score} meter.`, "Prov igjen", true);
+  setOverlay(`Du kom til level ${state.level} og nadde ${score} meter. Banken din er pa ${state.progression.bankCoins} coins.`, "Prov igjen", true);
 }
-
 function ensureMusic() {
   if (music.context) {
     if (music.context.state === "suspended") {
@@ -376,15 +723,39 @@ function isRunnerDashActive() {
   return state.runner.dashUntil > state.elapsedMs;
 }
 
-function activateDisco() {
-  state.effects.discoUntil = state.elapsedMs + discoDurationMs;
+function isFrogActive() {
+  return state.skillState.frogUntil > state.elapsedMs;
+}
+
+function isSpeedSkillActive() {
+  return state.skillState.speedUntil > state.elapsedMs;
+}
+
+function isBananaActive() {
+  return state.effects.bananaUntil > state.elapsedMs;
+}
+
+function activateDisco(duration = discoDurationMs) {
+  state.effects.discoUntil = Math.max(state.effects.discoUntil, state.elapsedMs + duration);
   addFloatingText("DISCO!", width / 2, state.cameraY + 220, "#ff4fd8", 70);
 }
 
-function activateJetpack() {
-  state.effects.jetpackUntil = state.elapsedMs + jetpackDurationMs;
-  state.player.vy = -17;
+function activateJetpack(power = -17, duration = jetpackDurationMs) {
+  state.effects.jetpackUntil = Math.max(state.effects.jetpackUntil, state.elapsedMs + duration);
+  state.player.vy = Math.min(state.player.vy, power);
   addFloatingText("JETPACK!", state.player.x + state.player.w / 2, state.player.y - 18, "#ff8c42", 60);
+}
+
+function activateBananaSurprise() {
+  state.skillState.bananaTriggered = true;
+  state.effects.bananaUntil = state.elapsedMs + 7000;
+  state.skillState.bananaPulseUntil = state.elapsedMs + 7000;
+  activateDisco(7000);
+  activateJetpack(-18.4, 1000);
+  state.progression.bankCoins += 12;
+  saveProgression();
+  updateProfileBar();
+  addFloatingText("BANANAMANIA!", width / 2, state.cameraY + 200, "#ffe066", 90);
 }
 
 function scheduleTone(type, frequency, startTime, duration, gainNode, volume) {
@@ -410,19 +781,20 @@ function updateMusic() {
 
   const disco = isDiscoActive();
   const runnerMode = state.mode === "runner";
-  const sequence = runnerMode ? music.runnerSequence : disco ? music.discoSequence : music.sequence;
+  const sequence = runnerMode ? music.runnerSequence : disco ? music.discoSequence : getSelectedMap().musicSequence;
   const lookAhead = 0.18;
-  const intensity = Math.min(1, 0.22 + (state.heightScore / 90) + (state.level - 1) * 0.14 + (disco ? 0.3 : 0) + (runnerMode ? 0.2 : 0));
-  const beatLength = state.running ? (runnerMode ? 0.18 : disco ? 0.16 : 0.24) - intensity * 0.05 : 0.29;
+  const intensity = Math.min(1, 0.2 + (state.heightScore / 95) + (state.level - 1) * 0.14 + (disco ? 0.3 : 0) + (runnerMode ? 0.2 : 0));
+  const baseBeat = runnerMode ? 0.18 : disco ? 0.16 : 0.25;
+  const beatLength = state.running ? clamp(baseBeat - intensity * 0.05, 0.11, 0.32) : 0.3;
 
-  music.master.gain.setTargetAtTime(state.running ? (runnerMode ? 0.22 : disco ? 0.24 : 0.19) : 0.1, music.context.currentTime, 0.08);
+  music.master.gain.setTargetAtTime(state.running ? (runnerMode ? 0.22 : disco ? 0.24 : 0.18) : 0.1, music.context.currentTime, 0.08);
   music.leadGain.gain.setTargetAtTime(0.05 + intensity * 0.07, music.context.currentTime, 0.08);
   music.pulseGain.gain.setTargetAtTime(state.running ? (runnerMode ? 0.065 : disco ? 0.075 : 0.05) : 0.025, music.context.currentTime, 0.08);
 
   while (music.nextNoteTime < music.context.currentTime + lookAhead) {
     const note = sequence[music.step % sequence.length];
     scheduleTone(runnerMode ? "square" : disco ? "sawtooth" : "triangle", note.bass, music.nextNoteTime, beatLength * 0.9, music.bassGain, 0.6);
-    scheduleTone(runnerMode ? "triangle" : disco ? "triangle" : "square", note.lead * (music.step % 2 === 0 ? 1.0 : 0.5), music.nextNoteTime, beatLength * 0.58, music.leadGain, 0.24 + intensity * 0.08);
+    scheduleTone(runnerMode ? "triangle" : disco ? "triangle" : "square", note.lead * (music.step % 2 === 0 ? 1 : 0.5), music.nextNoteTime, beatLength * 0.58, music.leadGain, 0.24 + intensity * 0.08);
 
     if (note.pulse) {
       scheduleTone("square", 120 + intensity * 50, music.nextNoteTime, 0.05, music.pulseGain, runnerMode ? 0.14 : disco ? 0.16 : 0.11);
@@ -441,34 +813,36 @@ function getRunDifficulty() {
 
 function getPlatformWidth() {
   const difficulty = getRunDifficulty();
-  return Math.max(40, basePlatformWidth - state.level * 4 - difficulty * 26);
+  const bananaBonus = isBananaActive() ? 16 : 0;
+  return Math.max(40, basePlatformWidth - state.level * 4 - difficulty * 26 + bananaBonus);
 }
 
 function getPlatformGap() {
   const difficulty = getRunDifficulty();
-  return Math.min(154, basePlatformGap + state.level * 5 + difficulty * 24);
+  const bananaRelief = isBananaActive() ? 10 : 0;
+  return Math.min(154, basePlatformGap + state.level * 5 + difficulty * 24 - bananaRelief);
 }
 
 function getJumpVelocity() {
   const difficulty = getRunDifficulty();
-  return baseJumpVelocity - Math.min(1.2, (state.level - 1) * 0.1) - difficulty * 0.65;
+  let jump = baseJumpVelocity - Math.min(1.2, (state.level - 1) * 0.1) - difficulty * 0.65;
+  if (isFrogActive()) {
+    jump -= 1.6;
+  }
+  if (isBananaActive()) {
+    jump -= 0.6;
+  }
+  return jump;
 }
 
 function getGravity(vy) {
   const difficulty = getRunDifficulty();
+  const bananaShift = isBananaActive() ? -0.03 : 0;
 
-  if (vy < -7) {
-    return 0.22 + difficulty * 0.015;
-  }
-  if (vy < -2) {
-    return 0.18 + difficulty * 0.02;
-  }
-  if (vy < 1.2) {
-    return 0.12 + difficulty * 0.02;
-  }
-  if (vy < 6) {
-    return 0.27 + difficulty * 0.025;
-  }
+  if (vy < -7) return 0.22 + difficulty * 0.015 + bananaShift;
+  if (vy < -2) return 0.18 + difficulty * 0.02 + bananaShift;
+  if (vy < 1.2) return 0.12 + difficulty * 0.02 + bananaShift;
+  if (vy < 6) return 0.27 + difficulty * 0.025;
   return 0.34 + difficulty * 0.03;
 }
 
@@ -561,14 +935,11 @@ function enterRunnerMode() {
   state.effects.discoUntil = 0;
   state.effects.jetpackUntil = 0;
   resetRunnerState();
-  setControlMode();
-
   state.player.x = 84;
   state.player.y = runnerGroundY - state.player.h;
   state.player.vx = 0;
   state.player.vy = 0;
   state.player.bounceSquash = 0;
-
   addFloatingText("PORTAL RUN!", width / 2, state.cameraY + 220, "#00d1ff", 72);
 }
 
@@ -586,8 +957,6 @@ function rebuildJumperWorld(baseY) {
 
 function exitRunnerMode(success) {
   state.mode = "jumper";
-  setControlMode();
-
   state.heightScore = Math.max(0, state.heightScore + (success ? runnerBonusScore : -runnerCrashPenalty));
   state.cameraY = -state.heightScore * 10;
 
@@ -604,7 +973,6 @@ function exitRunnerMode(success) {
   addFloatingText(success ? "PORTAL BOOST!" : "SMELL!", width / 2, state.cameraY + 200, success ? "#00d1ff" : "#ff6b6b", 70);
   updateHud();
 }
-
 function updatePlatforms() {
   for (const platform of state.platforms) {
     if (!platform.vx || platform.broken) {
@@ -619,6 +987,18 @@ function updatePlatforms() {
   }
 }
 
+function resetSkillState() {
+  const selected = state.progression.selectedSkill;
+  state.skillState = {
+    selected,
+    extraLifeUsed: false,
+    frogUntil: selected === "frog_hop" ? 9000 : 0,
+    speedUntil: selected === "superspeed" ? 10000 : 0,
+    bananaTriggered: false,
+    bananaPulseUntil: 0
+  };
+}
+
 function resetGame() {
   state.mode = "jumper";
   state.cameraY = 0;
@@ -630,10 +1010,12 @@ function resetGame() {
   state.elapsedMs = 0;
   state.effects.discoUntil = 0;
   state.effects.jetpackUntil = 0;
+  state.effects.bananaUntil = 0;
   state.floatingTexts = [];
   state.runner.triggered = false;
   state.runner.completed = false;
   resetRunnerState();
+  resetSkillState();
 
   state.player = {
     x: width / 2 - 22,
@@ -647,7 +1029,6 @@ function resetGame() {
 
   rebuildJumperWorld(height - 90);
   updateHud();
-  setControlMode();
 }
 
 function updateHud() {
@@ -655,6 +1036,7 @@ function updateHud() {
   coinsEl.textContent = `${state.coins} / ${coinsPerLevel}`;
   levelEl.textContent = `${state.level}`;
   bestEl.textContent = `${Math.floor(state.bestScore)} m`;
+  updateProfileBar();
 }
 
 function levelUp() {
@@ -678,6 +1060,31 @@ function spawnPlatforms() {
   state.collectibles = state.collectibles.filter((item) => !item.collected && item.y < state.cameraY + height + 180);
 }
 
+function updateMagnetizedPickups() {
+  if (!isBananaActive()) {
+    return;
+  }
+
+  const playerCenterX = state.player.x + state.player.w / 2;
+  const playerCenterY = state.player.y + state.player.h / 2;
+
+  for (const item of state.collectibles) {
+    if (item.collected || item.type !== "coin") {
+      continue;
+    }
+
+    const dx = playerCenterX - item.x;
+    const dy = playerCenterY - item.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance > 130) {
+      continue;
+    }
+
+    item.x += dx * 0.08;
+    item.y += dy * 0.08;
+  }
+}
+
 function collectPickups() {
   const player = state.player;
 
@@ -694,6 +1101,9 @@ function collectPickups() {
       if (item.type === "coin") {
         const bonus = isDiscoActive() ? 2 : 1;
         state.coins += bonus;
+        state.progression.bankCoins += bonus;
+        saveProgression();
+        updateProfileBar();
         addFloatingText(`+${bonus}`, item.x, item.y, "#f9b208");
         if (state.coins >= coinsPerLevel) {
           levelUp();
@@ -726,24 +1136,52 @@ function finishRun() {
   showGameOverOverlay();
 }
 
+function getMoveIntent() {
+  const keyboardAxis = (state.keys.right ? 1 : 0) - (state.keys.left ? 1 : 0);
+  return clamp(keyboardAxis + state.touch.axis, -1, 1);
+}
+
+function reviveFromFall() {
+  if (state.progression.selectedSkill !== "extra_life" || state.skillState.extraLifeUsed) {
+    return false;
+  }
+
+  state.skillState.extraLifeUsed = true;
+  const rescuePlatformY = state.cameraY + height - 160;
+  const rescuePlatform = createPlatform(rescuePlatformY, true, null);
+  rescuePlatform.cracked = false;
+  rescuePlatform.vx = 0;
+  state.platforms.push(rescuePlatform);
+  state.player.x = width / 2 - state.player.w / 2;
+  state.player.y = rescuePlatformY - state.player.h - 10;
+  state.player.vx = 0;
+  state.player.vy = getJumpVelocity() - 0.8;
+  state.player.bounceSquash = 1;
+  addFloatingText("EKSTRALIV!", width / 2, state.cameraY + 220, "#7cff95", 70);
+  return true;
+}
+
 function updateJumperPlayer() {
   const player = state.player;
   const difficulty = getRunDifficulty();
-  const airAcceleration = 0.36 + difficulty * 0.08;
-  const maxMoveSpeed = moveSpeed + difficulty * 0.62;
+  const moveIntent = getMoveIntent();
+  const airAcceleration = 0.36 + difficulty * 0.08 + (isSpeedSkillActive() ? 0.11 : 0) + (isBananaActive() ? 0.06 : 0);
+  const maxMoveSpeed = moveSpeed + difficulty * 0.62 + (isSpeedSkillActive() ? 1.15 : 0) + (isBananaActive() ? 0.45 : 0);
 
   player.bounceSquash *= 0.84;
 
-  if (state.keys.left) {
-    player.vx = Math.max(player.vx - airAcceleration, -maxMoveSpeed);
-  } else if (state.keys.right) {
-    player.vx = Math.min(player.vx + airAcceleration, maxMoveSpeed);
+  if (Math.abs(moveIntent) > 0.04) {
+    player.vx += moveIntent * airAcceleration;
   } else {
     player.vx *= 0.84;
   }
 
   if (isJetpackActive()) {
     player.vy = Math.min(player.vy, -11.5);
+  }
+
+  if (state.progression.selectedSkill === "banana" && !state.skillState.bananaTriggered && state.heightScore >= 900) {
+    activateBananaSurprise();
   }
 
   player.vy += getGravity(player.vy);
@@ -783,6 +1221,7 @@ function updateJumperPlayer() {
     }
   }
 
+  updateMagnetizedPickups();
   collectPickups();
 
   const targetCamera = Math.min(state.cameraY, player.y - 260);
@@ -792,6 +1231,7 @@ function updateJumperPlayer() {
     if (state.heightScore > state.bestScore) {
       state.bestScore = state.heightScore;
       localStorage.setItem(bestScoreKey, String(Math.floor(state.bestScore)));
+      unlockBananaIfNeeded(state.bestScore);
     }
     updateHud();
   }
@@ -803,7 +1243,9 @@ function updateJumperPlayer() {
   }
 
   if (player.y - state.cameraY > height + 140) {
-    finishRun();
+    if (!reviveFromFall()) {
+      finishRun();
+    }
   }
 }
 
@@ -840,15 +1282,9 @@ function updateRunnerPlayer() {
   }
 
   if (!runner.portal && runner.distance >= runner.portalDistance) {
-    runner.portal = {
-      x: width + 80,
-      y: runnerGroundY - 92,
-      w: 54,
-      h: 92
-    };
+    runner.portal = { x: width + 80, y: runnerGroundY - 92, w: 54, h: 92 };
     addFloatingText("PORTAL!", width / 2, runnerGroundY - 120, "#00d1ff", 42);
-    state.touch.active = false;
-    state.touch.axis = 0;
+    clearTouchInput();
   }
 
   if (!runner.portal && runner.distance >= runner.nextObstacleAt) {
@@ -865,12 +1301,7 @@ function updateRunnerPlayer() {
     runner.portal.x -= speed;
   }
 
-  const playerBox = {
-    x: player.x + 6,
-    y: player.y + 6,
-    w: player.w - 12,
-    h: player.h - 6
-  };
+  const playerBox = { x: player.x + 6, y: player.y + 6, w: player.w - 12, h: player.h - 6 };
 
   if (runner.portal) {
     const portalHit = playerBox.x < runner.portal.x + runner.portal.w &&
@@ -924,16 +1355,16 @@ function stepSimulation() {
   updateJumperPlayer();
   spawnPlatforms();
 }
-
 function drawBackground() {
   ctx.clearRect(0, 0, width, height);
+  const mapTheme = getSelectedMap().theme;
 
   if (state.mode === "runner") {
     const offset = state.runner.backgroundOffset;
     const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, "#0f172a");
-    gradient.addColorStop(0.6, "#1d3557");
-    gradient.addColorStop(1, "#2d6a4f");
+    gradient.addColorStop(0, mapTheme.runnerTop);
+    gradient.addColorStop(0.6, mapTheme.runnerMid);
+    gradient.addColorStop(1, mapTheme.runnerBottom);
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
@@ -956,11 +1387,11 @@ function drawBackground() {
   const difficulty = getRunDifficulty();
   const disco = isDiscoActive();
   const pulse = disco ? (Math.sin(state.elapsedMs / 120) + 1) * 0.5 : 0;
-  const tint = Math.floor(difficulty * 60 + pulse * 80);
+  const tint = Math.floor(difficulty * 50 + pulse * 80);
   const gradient = ctx.createLinearGradient(0, 0, 0, height);
-  gradient.addColorStop(0, disco ? `rgb(${180 + Math.floor(pulse * 60)}, ${110 + tint}, 255)` : `rgb(${120 + tint}, ${207 - Math.floor(tint * 0.2)}, 255)`);
-  gradient.addColorStop(0.55, disco ? `rgb(${255 - Math.floor(pulse * 80)}, ${235 - Math.floor(pulse * 30)}, 255)` : "#dff7ff");
-  gradient.addColorStop(1, disco ? `rgb(${255}, ${215 + Math.floor(pulse * 30)}, ${170 + Math.floor(pulse * 40)})` : "#fff4c9");
+  gradient.addColorStop(0, disco ? `rgb(${180 + Math.floor(pulse * 60)}, ${110 + tint}, 255)` : mapTheme.top);
+  gradient.addColorStop(0.55, disco ? `rgb(${255 - Math.floor(pulse * 80)}, ${235 - Math.floor(pulse * 30)}, 255)` : mapTheme.mid);
+  gradient.addColorStop(1, disco ? `rgb(255, ${215 + Math.floor(pulse * 30)}, ${170 + Math.floor(pulse * 40)})` : mapTheme.bottom);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
 
@@ -978,7 +1409,7 @@ function drawBackground() {
   for (let i = 0; i < (lowFxMode ? 4 : 6); i += 1) {
     const cloudX = (i * 90 + (state.cameraY * -0.08)) % (width + 120) - 60;
     const cloudY = 60 + i * 90;
-    ctx.fillStyle = disco ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.65)";
+    ctx.fillStyle = mapTheme.cloud;
     ctx.beginPath();
     ctx.arc(cloudX, cloudY, 24, 0, Math.PI * 2);
     ctx.arc(cloudX + 22, cloudY + 8, 18, 0, Math.PI * 2);
@@ -992,11 +1423,16 @@ function drawPlatforms() {
     return;
   }
 
+  const mapId = getSelectedMap().id;
+  const movingColor = mapId === "frost" ? "#5b8cff" : mapId === "sunset" ? "#7a3fff" : "#8a4fff";
+  const staticColor = mapId === "frost" ? "#4c8bb5" : mapId === "sunset" ? "#9f5a2f" : state.level % 2 === 0 ? "#3d5f9b" : "#3d9b53";
+  const glowColor = mapId === "frost" ? "#cde8ff" : mapId === "sunset" ? "#ffd8b1" : state.level % 2 === 0 ? "#8fb1ff" : "#7ad08e";
+
   for (const platform of state.platforms) {
     const screenY = platform.y - state.cameraY;
-    ctx.fillStyle = platform.cracked ? "#8d6f64" : platform.vx ? "#8a4fff" : state.level % 2 === 0 ? "#3d5f9b" : "#3d9b53";
+    ctx.fillStyle = platform.cracked ? "#8d6f64" : platform.vx ? movingColor : staticColor;
     ctx.fillRect(platform.x, screenY, platform.w, platform.h);
-    ctx.fillStyle = platform.cracked ? "#d8c0b1" : platform.vx ? "#c4a0ff" : state.level % 2 === 0 ? "#8fb1ff" : "#7ad08e";
+    ctx.fillStyle = platform.cracked ? "#d8c0b1" : glowColor;
     ctx.fillRect(platform.x + 4, screenY + 3, platform.w - 8, 4);
 
     if (platform.cracked) {
@@ -1046,12 +1482,11 @@ function drawCollectibles() {
     const pulse = 1 + Math.sin((state.elapsedMs / 120) + item.y * 0.02) * 0.08;
 
     if (item.type === "coin") {
-      ctx.fillStyle = "#f9b208";
+      ctx.fillStyle = isBananaActive() ? "#ffe066" : "#f9b208";
       ctx.beginPath();
       ctx.arc(item.x, screenY, item.r * pulse, 0, Math.PI * 2);
       ctx.fill();
-
-      ctx.fillStyle = "#ffe08a";
+      ctx.fillStyle = "#fff3bf";
       ctx.beginPath();
       ctx.arc(item.x - 2, screenY - 2, item.r * 0.45, 0, Math.PI * 2);
       ctx.fill();
@@ -1105,6 +1540,7 @@ function drawFloatingTexts() {
 
 function drawPlayer() {
   const player = state.player;
+  const skin = getSelectedSkin();
   const screenX = player.x;
   const screenY = state.mode === "runner" ? player.y : player.y - state.cameraY;
   const squash = 1 + player.bounceSquash * 0.12;
@@ -1136,34 +1572,34 @@ function drawPlayer() {
     }
   }
 
-  ctx.fillStyle = disco ? `hsl(${(state.elapsedMs / 6) % 360}, 80%, 52%)` : state.mode === "runner" ? "#ff8c42" : "#1f3c88";
+  ctx.fillStyle = disco ? `hsl(${(state.elapsedMs / 6) % 360}, 80%, 52%)` : skin.colors.body;
   ctx.beginPath();
   ctx.roundRect(bodyX, bodyY + 8, bodyW, bodyH - 8, 16);
   ctx.fill();
 
-  ctx.fillStyle = "#ffd7a8";
+  ctx.fillStyle = skin.id === "melon" ? "#2f6f36" : skin.id === "robot" ? "#d7dee9" : skin.id === "toast" ? "#f4d4a5" : "#ffd7a8";
   ctx.beginPath();
   ctx.arc(screenX + player.w / 2, bodyY + 14, 12, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = "#0f172a";
+  ctx.fillStyle = skin.colors.accent;
   ctx.beginPath();
   ctx.roundRect(screenX + 7, bodyY + 8, player.w - 14, 10, 6);
   ctx.fill();
-  ctx.fillStyle = "#7dd3fc";
+  ctx.fillStyle = skin.colors.visor;
   ctx.beginPath();
   ctx.arc(screenX + 16, bodyY + 13, 4.2, 0, Math.PI * 2);
   ctx.arc(screenX + player.w - 16, bodyY + 13, 4.2, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = "#0f172a";
+  ctx.strokeStyle = skin.colors.accent;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(screenX + 18, bodyY + 17);
   ctx.quadraticCurveTo(screenX + player.w / 2, bodyY + 21, screenX + player.w - 18, bodyY + 17);
   ctx.stroke();
 
-  ctx.fillStyle = disco ? "#ff4fd8" : "#ff5f6d";
+  ctx.fillStyle = disco ? "#ff4fd8" : skin.colors.cape;
   ctx.beginPath();
   ctx.moveTo(screenX + 5, bodyY + 24);
   ctx.lineTo(screenX + player.w - 5, bodyY + 22);
@@ -1171,7 +1607,23 @@ function drawPlayer() {
   ctx.lineTo(screenX + 8, bodyY + 32);
   ctx.fill();
 
-  ctx.strokeStyle = "#102235";
+  if (skin.id === "robot") {
+    ctx.fillStyle = "rgba(0, 209, 255, 0.4)";
+    ctx.fillRect(screenX + 18, bodyY + 2, 8, 10);
+  }
+  if (skin.id === "toast") {
+    ctx.strokeStyle = "#6b3e26";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(bodyX + 2, bodyY + 10, bodyW - 4, bodyH - 16);
+  }
+  if (skin.id === "melon") {
+    ctx.fillStyle = "#0c5f29";
+    for (let i = 0; i < 3; i += 1) {
+      ctx.fillRect(screenX + 10 + i * 8, bodyY + 28, 3, 10);
+    }
+  }
+
+  ctx.strokeStyle = skin.colors.accent;
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(screenX + 12, bodyY + bodyH - 2);
@@ -1187,7 +1639,7 @@ function drawRunnerUi() {
   }
 
   ctx.fillStyle = "rgba(15, 23, 42, 0.55)";
-  ctx.fillRect(14, 14, 164, 46);
+  ctx.fillRect(14, 14, 170, 46);
   ctx.fillStyle = "#ffffff";
   ctx.font = "bold 18px Trebuchet MS";
   ctx.fillText(`Portal: ${Math.max(0, Math.floor((state.runner.portalDistance - state.runner.distance) / 10))} m`, 24, 42);
@@ -1201,7 +1653,6 @@ function drawFrame() {
   drawFloatingTexts();
   drawRunnerUi();
 }
-
 function loop(timestamp) {
   if (!state.lastFrameTime) {
     state.lastFrameTime = timestamp;
@@ -1233,12 +1684,18 @@ function startGame() {
   resetGame();
   state.running = true;
   state.lastFrameTime = 0;
-  state.touch.active = false;
-  state.touch.axis = 0;
+  clearTouchInput();
   scoreEntryEl.classList.add("hidden");
   leaderboardPanelEl.classList.add("hidden");
   setOverlay("", "", false);
   state.player.vy = getJumpVelocity();
+
+  if (state.progression.selectedSkill === "frog_hop") {
+    addFloatingText("FROSKEHOPP!", width / 2, state.cameraY + 220, "#7cff95", 65);
+  }
+  if (state.progression.selectedSkill === "superspeed") {
+    addFloatingText("SUPERSPEED!", width / 2, state.cameraY + 220, "#7dd3fc", 65);
+  }
 }
 
 function getCanvasPoint(event) {
@@ -1376,6 +1833,21 @@ canvas.addEventListener("pointerup", releasePointer);
 canvas.addEventListener("pointercancel", releasePointer);
 canvas.addEventListener("lostpointercapture", releasePointer);
 
+overlayEl.addEventListener("click", (event) => {
+  const button = event.target.closest(".shop-button");
+  if (!button) {
+    return;
+  }
+
+  const kind = button.dataset.kind;
+  const id = button.dataset.id;
+  if (!kind || !id) {
+    return;
+  }
+
+  purchase(kind, id);
+});
+
 actionEl.addEventListener("click", startGame);
 saveScoreEl.addEventListener("click", submitScore);
 
@@ -1388,12 +1860,11 @@ playerNameEl.addEventListener("input", () => {
   localStorage.setItem(playerNameKey, cleanName);
 });
 
+state.progression = loadProgression();
+applyBodyTheme();
 resetGame();
 showStartOverlay();
 updateHud();
+renderShop();
 fetchLeaderboard();
 requestAnimationFrame(loop);
-
-
-
-
