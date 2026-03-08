@@ -333,3 +333,13 @@ button,
 #action {
   width: 100%;
 }
+
+html,
+body {
+  touch-action: auto;
+}
+
+.game-shell,
+#game {
+  touch-action: none;
+}

@@ -227,7 +227,7 @@ const state = {
   leaderboard: [],
   progression: null,
   keys: { left: false, right: false },
-  touch: { active: false, pointerId: null, startX: 0, axis: 0 },
+  touch: { active: false, pointerId: null, startX: 0, lastX: 0, lastTime: 0 },
   player: null,
   platforms: [],
   collectibles: [],
@@ -1137,8 +1137,7 @@ function finishRun() {
 }
 
 function getMoveIntent() {
-  const keyboardAxis = (state.keys.right ? 1 : 0) - (state.keys.left ? 1 : 0);
-  return clamp(keyboardAxis + state.touch.axis, -1, 1);
+  return (state.keys.right ? 1 : 0) - (state.keys.left ? 1 : 0);
 }
 
 function reviveFromFall() {
@@ -1710,21 +1709,27 @@ function setKeyboardInput(direction, isPressed) {
   state.keys[direction] = isPressed;
 }
 
-function updateTouchAxis(x) {
-  const delta = x - state.touch.startX;
-  const deadzone = 18;
-  const maxDistance = 90;
-  if (Math.abs(delta) <= deadzone) {
-    state.touch.axis = 0;
+function applyTouchSwipe(x, timeStamp) {
+  const dx = x - state.touch.lastX;
+  const dt = Math.max(8, timeStamp - state.touch.lastTime);
+
+  state.touch.lastX = x;
+  state.touch.lastTime = timeStamp;
+
+  if (Math.abs(dx) < 2 || !state.player) {
     return;
   }
-  state.touch.axis = clamp(delta / maxDistance, -1, 1);
+
+  const impulse = clamp((dx / dt) * 1.25, -1.85, 1.85);
+  state.player.vx += impulse + Math.sign(impulse) * 0.06;
 }
 
 function clearTouchInput() {
   state.touch.active = false;
   state.touch.pointerId = null;
-  state.touch.axis = 0;
+  state.touch.startX = 0;
+  state.touch.lastX = 0;
+  state.touch.lastTime = 0;
 }
 
 function handleRunnerTap(pointX) {
@@ -1781,6 +1786,9 @@ window.addEventListener("keyup", (event) => {
 
 for (const element of [document.body, canvas]) {
   element.addEventListener("touchmove", (event) => {
+    if (event.target.closest(".panel")) {
+      return;
+    }
     event.preventDefault();
   }, { passive: false });
 }
@@ -1814,7 +1822,8 @@ canvas.addEventListener("pointerdown", (event) => {
   state.touch.active = true;
   state.touch.pointerId = event.pointerId;
   state.touch.startX = point.x;
-  state.touch.axis = 0;
+  state.touch.lastX = point.x;
+  state.touch.lastTime = event.timeStamp;
   if (canvas.setPointerCapture) {
     canvas.setPointerCapture(event.pointerId);
   }
@@ -1825,7 +1834,7 @@ canvas.addEventListener("pointermove", (event) => {
     return;
   }
   const point = getCanvasPoint(event);
-  updateTouchAxis(point.x);
+  applyTouchSwipe(point.x, event.timeStamp);
 });
 
 const releasePointer = (event) => {
@@ -1878,4 +1887,7 @@ updateHud();
 renderShop();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
+
 
