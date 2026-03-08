@@ -377,8 +377,8 @@ body {
 }
 
 #game {
-  height: min(calc(100dvh - 168px), 820px);
-  min-height: 68vh;
+  height: min(calc(100dvh - 132px), 860px);
+  min-height: 72vh;
 }
 
 .help {
@@ -389,3 +389,5 @@ body {
 .hud {
   gap: 8px;
 }
+
+

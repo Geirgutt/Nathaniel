@@ -430,6 +430,22 @@ function renderShop() {
   renderShopCards(skinsShopEl, skins, "skin");
   renderShopCards(mapsShopEl, maps, "map");
   renderShopCards(skillsShopEl, skills, "skill");
+
+  for (const button of document.querySelectorAll(".shop-button")) {
+    button.onclick = () => {
+      const kind = button.dataset.kind;
+      const id = button.dataset.id;
+      if (!kind || !id) {
+        return;
+      }
+      purchase(kind, id);
+    };
+    button.onpointerup = (event) => {
+      event.preventDefault();
+      button.click();
+    };
+  }
+
   updateProfileBar();
 }
 
@@ -1183,8 +1199,8 @@ function updateJumperPlayer() {
 
   if (state.touch.active && isCoarsePointer) {
     const followDelta = state.touch.targetX - player.x;
-    player.x += followDelta * 0.42;
-    player.vx = clamp((player.vx * 0.4) + (followDelta * 0.09), -maxMoveSpeed * 1.1, maxMoveSpeed * 1.1);
+    const desiredVx = clamp(followDelta * 0.16, -maxMoveSpeed * 0.95, maxMoveSpeed * 0.95);
+    player.vx = clamp((player.vx * 0.78) + (desiredVx * 0.22), -maxMoveSpeed, maxMoveSpeed);
   } else if (Math.abs(moveIntent) > 0.04) {
     player.vx += moveIntent * airAcceleration;
   } else {
@@ -1737,7 +1753,7 @@ function applyTouchSwipe(x, timeStamp) {
   }
 
   const totalDelta = x - state.touch.startX;
-  state.touch.targetX = clamp(state.touch.startPlayerX + (totalDelta * 1.12), -state.player.w, width);
+  state.touch.targetX = clamp(state.touch.startPlayerX + (totalDelta * 0.72), -state.player.w, width);
 
   if (Math.abs(dx) < 1) {
     return;
@@ -1751,6 +1767,8 @@ function clearTouchInput() {
   state.touch.active = false;
   state.touch.pointerId = null;
   state.touch.startX = 0;
+  state.touch.startPlayerX = 0;
+  state.touch.targetX = 0;
   state.touch.lastX = 0;
   state.touch.lastTime = 0;
 }
@@ -1845,6 +1863,8 @@ canvas.addEventListener("pointerdown", (event) => {
   state.touch.active = true;
   state.touch.pointerId = event.pointerId;
   state.touch.startX = point.x;
+  state.touch.startPlayerX = state.player.x;
+  state.touch.targetX = state.player.x;
   state.touch.lastX = point.x;
   state.touch.lastTime = event.timeStamp;
   if (canvas.setPointerCapture) {
@@ -1871,31 +1891,15 @@ canvas.addEventListener("pointerup", releasePointer);
 canvas.addEventListener("pointercancel", releasePointer);
 canvas.addEventListener("lostpointercapture", releasePointer);
 
-function handleOverlayPress(event) {
-  const categoryButton = event.target.closest(".shop-category");
-  if (categoryButton) {
+for (const categoryButton of shopCategoryEls) {
+  categoryButton.onclick = () => {
+    setShopCategory(categoryButton.dataset.category || "skins");
+  };
+  categoryButton.onpointerup = (event) => {
     event.preventDefault();
-    setShopCategory(categoryButton.dataset.category);
-    return;
-  }
-
-  const button = event.target.closest(".shop-button");
-  if (!button) {
-    return;
-  }
-
-  const kind = button.dataset.kind;
-  const id = button.dataset.id;
-  if (!kind || !id) {
-    return;
-  }
-
-  event.preventDefault();
-  purchase(kind, id);
+    categoryButton.click();
+  };
 }
-
-overlayEl.addEventListener("click", handleOverlayPress);
-overlayEl.addEventListener("pointerup", handleOverlayPress);
 
 actionEl.addEventListener("click", (event) => {
   event.preventDefault();
@@ -1921,6 +1925,17 @@ updateHud();
 renderShop();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
+
+
+
+
+
+
+
+
+
 
 
 
