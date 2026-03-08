@@ -237,7 +237,7 @@ const state = {
   leaderboard: [],
   progression: null,
   keys: { left: false, right: false },
-  touch: { active: false, pointerId: null, startX: 0, lastX: 0, lastTime: 0 },
+  touch: { active: false, pointerId: null, startX: 0, lastX: 0, lastTime: 0, lastSwipeSpeed: 0 },
   controlSpeed: clamp(Number(localStorage.getItem(controlSpeedKey)) || 1, 0.7, 1.8),
   pausedBySettings: false,
   player: null,
@@ -1763,13 +1763,17 @@ function applyTouchSwipe(x, timeStamp) {
   state.touch.lastX = x;
   state.touch.lastTime = timeStamp;
 
-  if (!state.player || Math.abs(dx) < 2) {
+  if (!state.player || Math.abs(dx) < 1) {
     return;
   }
 
+  const speedMult = state.controlSpeed || 1;
   const swipeSpeed = dx / dt;
-  const impulse = Math.sign(swipeSpeed) * Math.pow(Math.abs(swipeSpeed), 0.9) * 2.05;
-  state.player.vx = clamp(state.player.vx + clamp(impulse, -2.35, 2.35), -5.4, 5.4);
+  state.touch.lastSwipeSpeed = (state.touch.lastSwipeSpeed * 0.35) + (swipeSpeed * 0.65);
+
+  const targetVx = clamp(swipeSpeed * 13.2 * speedMult, -5.8 * speedMult, 5.8 * speedMult);
+  const impulse = Math.sign(swipeSpeed) * Math.pow(Math.abs(swipeSpeed), 0.88) * 1.25 * speedMult;
+  state.player.vx = clamp((state.player.vx * 0.45) + (targetVx * 0.55) + clamp(impulse, -1.65 * speedMult, 1.65 * speedMult), -6.1 * speedMult, 6.1 * speedMult);
 }
 
 function clearTouchInput() {
@@ -1778,6 +1782,7 @@ function clearTouchInput() {
   state.touch.startX = 0;
   state.touch.lastX = 0;
   state.touch.lastTime = 0;
+  state.touch.lastSwipeSpeed = 0;
 }
 
 function handleRunnerTap(pointX) {
@@ -1889,6 +1894,16 @@ const releasePointer = (event) => {
   if (state.touch.pointerId !== null && event.pointerId !== undefined && state.touch.pointerId !== event.pointerId) {
     return;
   }
+
+  if (state.running && state.mode === "jumper" && state.player && isCoarsePointer) {
+    const speedMult = state.controlSpeed || 1;
+    const flick = state.touch.lastSwipeSpeed || 0;
+    if (Math.abs(flick) > 0.08) {
+      const flickBoost = clamp(flick * 7.2 * speedMult, -3.0 * speedMult, 3.0 * speedMult);
+      state.player.vx = clamp(state.player.vx + flickBoost, -6.4 * speedMult, 6.4 * speedMult);
+    }
+  }
+
   clearTouchInput();
 };
 
@@ -1990,6 +2005,9 @@ renderShop();
 updateControlSpeedUi();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
+
 
 
 
