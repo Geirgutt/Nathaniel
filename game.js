@@ -26,7 +26,7 @@ const playerNameKey = "hopp-hoyest-player-name";
 const localLeaderboardKey = "hopp-hoyest-local-leaderboard";
 const coinsPerLevel = 12;
 const leaderboardLimit = 10;
-const supabaseConfig = window.SUPABASE_CONFIG || { url: "", anonKey: "", table: "scores" };
+const supabaseConfig = window.SUPABASE_CONFIG || { url: "", publishableKey: "", table: "scores" };
 
 const music = {
   context: null,
@@ -81,7 +81,7 @@ function getPlayerName() {
 }
 
 function hasSupabaseConfig() {
-  return Boolean(supabaseConfig.url && supabaseConfig.anonKey && supabaseConfig.table);
+  return Boolean(supabaseConfig.url && supabaseConfig.publishableKey && supabaseConfig.table);
 }
 
 function setScoreStatus(message) {
@@ -129,8 +129,8 @@ async function fetchLeaderboard() {
 
     const response = await fetch(`${supabaseConfig.url}/rest/v1/${supabaseConfig.table}?${params.toString()}`, {
       headers: {
-        apikey: supabaseConfig.anonKey,
-        Authorization: `Bearer ${supabaseConfig.anonKey}`
+        apikey: supabaseConfig.publishableKey,
+        Authorization: `Bearer ${supabaseConfig.publishableKey}`
       }
     });
 
@@ -182,8 +182,8 @@ async function submitScore() {
     const response = await fetch(`${supabaseConfig.url}/rest/v1/${supabaseConfig.table}`, {
       method: "POST",
       headers: {
-        apikey: supabaseConfig.anonKey,
-        Authorization: `Bearer ${supabaseConfig.anonKey}`,
+        apikey: supabaseConfig.publishableKey,
+        Authorization: `Bearer ${supabaseConfig.publishableKey}`,
         "Content-Type": "application/json",
         Prefer: "return=minimal"
       },
@@ -734,3 +734,5 @@ setOverlay("Trykk pa start og hopp sa hoyt du kan. Samle 12 mynter for neste lev
 updateHud();
 fetchLeaderboard();
 loop();
+
+
