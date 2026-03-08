@@ -464,3 +464,51 @@ body {
 .overlay:not(.hidden) ~ .settings-panel {
   display: none;
 }
+
+.control-mode-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.control-mode-btn {
+  min-height: 40px;
+  border-radius: 10px;
+  color: #17324d;
+  background: rgba(23, 50, 77, 0.08);
+}
+
+.control-mode-btn.active {
+  color: white;
+  background: linear-gradient(135deg, #17324d, #2e5d88);
+}
+
+.touch-buttons {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: calc(env(safe-area-inset-bottom) + 18px);
+  z-index: 8;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.touch-pad {
+  width: 68px;
+  height: 68px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgba(20, 47, 75, 0.34);
+  color: #ffffff;
+  font-size: 1.45rem;
+  line-height: 1;
+  box-shadow: 0 10px 22px rgba(10, 26, 44, 0.28);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+
+.touch-pad:active {
+  background: rgba(20, 47, 75, 0.55);
+}
