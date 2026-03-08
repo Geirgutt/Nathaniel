@@ -28,6 +28,11 @@ const settingsPanelEl = document.getElementById("settingsPanel");
 const settingsResumeEl = document.getElementById("settingsResume");
 const moveSpeedSliderEl = document.getElementById("moveSpeedSlider");
 const moveSpeedValueEl = document.getElementById("moveSpeedValue");
+const controlModeSwipeEl = document.getElementById("controlModeSwipe");
+const controlModeButtonsEl = document.getElementById("controlModeButtons");
+const touchButtonsEl = document.getElementById("touchButtons");
+const touchLeftBtnEl = document.getElementById("touchLeftBtn");
+const touchRightBtnEl = document.getElementById("touchRightBtn");
 
 const width = canvas.width;
 const height = canvas.height;
@@ -46,7 +51,10 @@ const runnerGroundY = height - 118;
 const bestScoreKey = "hopp-hoyest-best";
 const playerNameKey = "hopp-hoyest-player-name";
 const localLeaderboardKey = "hopp-hoyest-local-leaderboard";
-const controlSpeedKey = "hopp-hoyest-control-speed";
+const legacyControlSpeedKey = "hopp-hoyest-control-speed";
+const controlSpeedKey = "hopp-hoyest-control-speed-v2";
+const controlModeKey = "hopp-hoyest-control-mode";
+const controlSpeedBase = 1.8;
 const progressionKey = "hopp-hoyest-progression-v1";
 const coinsPerLevel = 12;
 const leaderboardLimit = 10;
@@ -238,7 +246,8 @@ const state = {
   progression: null,
   keys: { left: false, right: false },
   touch: { active: false, pointerId: null, startX: 0, lastX: 0, lastTime: 0, lastSwipeSpeed: 0 },
-  controlSpeed: clamp(Number(localStorage.getItem(controlSpeedKey)) || 1, 0.7, 1.8),
+  controlSpeed: loadControlSpeedSetting(),
+  controlMode: loadControlModeSetting(),
   pausedBySettings: false,
   player: null,
   platforms: [],
@@ -284,6 +293,28 @@ function rand(min, max) {
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function loadControlSpeedSetting() {
+  const saved = Number(localStorage.getItem(controlSpeedKey));
+  if (Number.isFinite(saved) && saved > 0) {
+    return clamp(saved, 0.5, 1.6);
+  }
+
+  const legacy = Number(localStorage.getItem(legacyControlSpeedKey));
+  if (Number.isFinite(legacy) && legacy > 0) {
+    return clamp(legacy / controlSpeedBase, 0.5, 1.6);
+  }
+
+  return 1;
+}
+
+function loadControlModeSetting() {
+  return localStorage.getItem(controlModeKey) === "swipe" ? "swipe" : "buttons";
+}
+
+function getControlSpeedMultiplier() {
+  return (state.controlSpeed || 1) * controlSpeedBase;
 }
 
 function sanitizeName(name) {
@@ -478,7 +509,6 @@ function selectOwned(kind, id) {
   }
   saveProgression();
   renderShop();
-updateControlSpeedUi();
 }
 
 function purchase(kind, id) {
@@ -520,7 +550,6 @@ function unlockBananaIfNeeded(score) {
   state.progression.ownedSkills = uniqueList(state.progression.ownedSkills);
   saveProgression();
   renderShop();
-updateControlSpeedUi();
   updateProfileBar();
   addFloatingText("MYSTISK BANAN LASES OPP!", width / 2, state.cameraY + 180, "#ffe066", 90);
   return true;
@@ -643,7 +672,6 @@ async function submitScore() {
     setScoreStatus("Score lagret lokalt.");
     scoreEntryEl.classList.add("hidden");
     renderShop();
-updateControlSpeedUi();
     return;
   }
 
@@ -680,6 +708,7 @@ function setOverlay(title, buttonText, show = true) {
   messageEl.textContent = title;
   actionEl.textContent = buttonText;
   overlayEl.classList.toggle("hidden", !show);
+  updateTouchButtonsVisibility();
 }
 
 function showStartOverlay() {
@@ -687,7 +716,6 @@ function showStartOverlay() {
   leaderboardPanelEl.classList.add("hidden");
   saveScoreEl.disabled = false;
   renderShop();
-updateControlSpeedUi();
   setOverlay("Start rolig, samle coins og bygg opp banken din. Portal-run venter ved 2000 meter.", "Start spill", true);
 }
 
@@ -698,7 +726,6 @@ async function showGameOverOverlay() {
   saveScoreEl.disabled = false;
   unlockBananaIfNeeded(score);
   renderShop();
-updateControlSpeedUi();
 
   const scores = await fetchLeaderboard();
   const qualifies = qualifiesForLeaderboard(score);
@@ -977,6 +1004,7 @@ function resetRunnerState() {
 
 function enterRunnerMode() {
   state.mode = "runner";
+  updateTouchButtonsVisibility();
   state.effects.discoUntil = 0;
   state.effects.jetpackUntil = 0;
   resetRunnerState();
@@ -1002,6 +1030,7 @@ function rebuildJumperWorld(baseY) {
 
 function exitRunnerMode(success) {
   state.mode = "jumper";
+  updateTouchButtonsVisibility();
   state.heightScore = Math.max(0, state.heightScore + (success ? runnerBonusScore : -runnerCrashPenalty));
   state.cameraY = -state.heightScore * 10;
 
@@ -1046,6 +1075,7 @@ function resetSkillState() {
 
 function resetGame() {
   state.mode = "jumper";
+  updateTouchButtonsVisibility();
   state.cameraY = 0;
   state.heightScore = 0;
   state.coins = 0;
@@ -1209,8 +1239,9 @@ function updateJumperPlayer() {
   const player = state.player;
   const difficulty = getRunDifficulty();
   const moveIntent = getMoveIntent();
-  const airAcceleration = (0.36 + difficulty * 0.08 + (isSpeedSkillActive() ? 0.11 : 0) + (isBananaActive() ? 0.06 : 0)) * (state.controlSpeed || 1);
-  const maxMoveSpeed = (moveSpeed + difficulty * 0.62 + (isSpeedSkillActive() ? 1.15 : 0) + (isBananaActive() ? 0.45 : 0)) * (state.controlSpeed || 1);
+  const controlMult = getControlSpeedMultiplier();
+  const airAcceleration = (0.36 + difficulty * 0.08 + (isSpeedSkillActive() ? 0.11 : 0) + (isBananaActive() ? 0.06 : 0)) * controlMult;
+  const maxMoveSpeed = (moveSpeed + difficulty * 0.62 + (isSpeedSkillActive() ? 1.15 : 0) + (isBananaActive() ? 0.45 : 0)) * controlMult;
   const touchSpeedCap = state.touch.active && isCoarsePointer ? maxMoveSpeed * 1.24 : maxMoveSpeed;
 
   player.bounceSquash *= 0.84;
@@ -1734,6 +1765,7 @@ function startGame() {
   leaderboardPanelEl.classList.add("hidden");
   setOverlay("", "", false);
   closeSettingsMenu();
+  updateTouchButtonsVisibility();
   state.player.vy = getJumpVelocity();
 
   if (state.progression.selectedSkill === "frog_hop") {
@@ -1767,7 +1799,7 @@ function applyTouchSwipe(x, timeStamp) {
     return;
   }
 
-  const speedMult = state.controlSpeed || 1;
+  const speedMult = getControlSpeedMultiplier();
   const swipeSpeed = dx / dt;
   state.touch.lastSwipeSpeed = (state.touch.lastSwipeSpeed * 0.35) + (swipeSpeed * 0.65);
 
@@ -1868,6 +1900,10 @@ canvas.addEventListener("pointerdown", (event) => {
     return;
   }
 
+  if (state.controlMode === "buttons") {
+    return;
+  }
+
   if (!isCoarsePointer && event.pointerType === "mouse") {
     return;
   }
@@ -1896,7 +1932,7 @@ const releasePointer = (event) => {
   }
 
   if (state.running && state.mode === "jumper" && state.player && isCoarsePointer) {
-    const speedMult = state.controlSpeed || 1;
+    const speedMult = getControlSpeedMultiplier();
     const flick = state.touch.lastSwipeSpeed || 0;
     if (Math.abs(flick) > 0.08) {
       const flickBoost = clamp(flick * 7.2 * speedMult, -3.0 * speedMult, 3.0 * speedMult);
@@ -1911,6 +1947,31 @@ canvas.addEventListener("pointerup", releasePointer);
 canvas.addEventListener("pointercancel", releasePointer);
 canvas.addEventListener("lostpointercapture", releasePointer);
 
+function bindTouchPad(button, direction) {
+  if (!button) {
+    return;
+  }
+
+  const release = () => setKeyboardInput(direction, false);
+  button.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    ensureMusic();
+    if (!state.running || state.mode !== "jumper" || state.controlMode !== "buttons") {
+      return;
+    }
+    setKeyboardInput(direction, true);
+    if (button.setPointerCapture) {
+      button.setPointerCapture(event.pointerId);
+    }
+  });
+  button.addEventListener("pointerup", release);
+  button.addEventListener("pointercancel", release);
+  button.addEventListener("pointerleave", release);
+  button.addEventListener("lostpointercapture", release);
+}
+
+bindTouchPad(touchLeftBtnEl, "left");
+bindTouchPad(touchRightBtnEl, "right");
 for (const categoryButton of shopCategoryEls) {
   categoryButton.onclick = () => {
     setShopCategory(categoryButton.dataset.category || "skins");
@@ -1947,11 +2008,42 @@ function updateControlSpeedUi() {
   }
 }
 
+function updateTouchButtonsVisibility() {
+  if (!touchButtonsEl) {
+    return;
+  }
+
+  const shouldShow = isCoarsePointer && state.running && state.mode === "jumper" && state.controlMode === "buttons" && overlayEl.classList.contains("hidden") && (settingsPanelEl?.classList.contains("hidden") ?? true);
+  touchButtonsEl.classList.toggle("hidden", !shouldShow);
+}
+
+function updateControlModeUi() {
+  if (controlModeSwipeEl) {
+    controlModeSwipeEl.classList.toggle("active", state.controlMode === "swipe");
+  }
+  if (controlModeButtonsEl) {
+    controlModeButtonsEl.classList.toggle("active", state.controlMode === "buttons");
+  }
+  if (state.controlMode === "swipe") {
+    setKeyboardInput("left", false);
+    setKeyboardInput("right", false);
+  }
+  updateTouchButtonsVisibility();
+}
+
+function setControlMode(mode) {
+  state.controlMode = mode === "swipe" ? "swipe" : "buttons";
+  localStorage.setItem(controlModeKey, state.controlMode);
+  clearTouchInput();
+  updateControlModeUi();
+}
+
 function openSettingsMenu() {
   if (!settingsPanelEl || !settingsPanelEl.classList.contains("hidden")) {
     return;
   }
   settingsPanelEl.classList.remove("hidden");
+  updateTouchButtonsVisibility();
   if (state.running) {
     state.running = false;
     state.pausedBySettings = true;
@@ -1968,6 +2060,7 @@ function closeSettingsMenu() {
     state.pausedBySettings = false;
     state.lastFrameTime = 0;
   }
+  updateTouchButtonsVisibility();
 }
 
 if (pauseMenuBtnEl) {
@@ -1990,10 +2083,22 @@ if (settingsResumeEl) {
 
 if (moveSpeedSliderEl) {
   moveSpeedSliderEl.addEventListener("input", () => {
-    const value = clamp(Number(moveSpeedSliderEl.value) || 1, 0.7, 1.8);
+    const value = clamp(Number(moveSpeedSliderEl.value) || 1, 0.5, 1.6);
     state.controlSpeed = value;
     localStorage.setItem(controlSpeedKey, value.toFixed(2));
     updateControlSpeedUi();
+  });
+}
+
+if (controlModeSwipeEl) {
+  controlModeSwipeEl.addEventListener("click", () => {
+    setControlMode("swipe");
+  });
+}
+
+if (controlModeButtonsEl) {
+  controlModeButtonsEl.addEventListener("click", () => {
+    setControlMode("buttons");
   });
 }
 state.progression = loadProgression();
@@ -2003,8 +2108,25 @@ showStartOverlay();
 updateHud();
 renderShop();
 updateControlSpeedUi();
+updateControlModeUi();
+updateTouchButtonsVisibility();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

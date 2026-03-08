@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <title>Hopp Høyest</title>
-  <link rel="stylesheet" href="style.css?v=20260308-16">
+  <title>Hopp H&oslash;yest</title>
+  <link rel="stylesheet" href="style.css?v=20260308-17">
 </head>
 <body>
   <main class="game-shell">
@@ -33,20 +33,29 @@
     <button id="pauseMenuBtn" class="pause-menu-btn" type="button" aria-label="Apne innstillinger">II</button>
     <div id="settingsPanel" class="settings-panel hidden" aria-label="Innstillinger">
       <h2>Innstillinger</h2>
+      <p class="settings-label">Styring</p>
+      <div class="control-mode-row">
+        <button id="controlModeSwipe" class="control-mode-btn" type="button">Swipe</button>
+        <button id="controlModeButtons" class="control-mode-btn active" type="button">Knapper</button>
+      </div>
       <label class="settings-label" for="moveSpeedSlider">Bevegelseshastighet</label>
-      <input id="moveSpeedSlider" class="settings-slider" type="range" min="0.70" max="1.80" step="0.05" value="1.00">
+      <input id="moveSpeedSlider" class="settings-slider" type="range" min="0.50" max="1.60" step="0.05" value="1.00">
       <p class="settings-value">Nivaa: <span id="moveSpeedValue">1.00</span>x</p>
       <button id="settingsResume" class="settings-close" type="button">Fortsett</button>
     </div>
+    <div id="touchButtons" class="touch-buttons hidden" aria-label="Touch-kontroller">
+      <button id="touchLeftBtn" class="touch-pad" type="button" aria-label="Venstre">&#8592;</button>
+      <button id="touchRightBtn" class="touch-pad" type="button" aria-label="H&oslash;yre">&#8594;</button>
+    </div>
 
     <section class="help">
-      <p>Mobil: swipe sidelengs. Rask swipe gir raskere sidefart, men med maksfart.</p>
+      <p>Mobil: standard er venstre/h&oslash;yre-knapper. Du kan bytte til swipe i pausemenyen.</p>
       <p>Portal-run: trykk venstre side for hopp, h&oslash;yre side for dash. PC bruker A/D.</p>
     </section>
 
     <div id="overlay" class="overlay hidden">
       <div class="panel">
-        <h1>Hopp Høyest</h1>
+        <h1>Hopp H&oslash;yest</h1>
         <p id="message">Trykk for &aring; starte.</p>
 
         <section class="profile-bar">
@@ -116,10 +125,16 @@
     </div>
   </main>
 
-  <script src="config.js?v=20260308-16"></script>
-  <script src="game.js?v=20260308-16"></script>
+  <script src="config.js?v=20260308-17"></script>
+  <script src="game.js?v=20260308-17"></script>
 </body>
 </html>
+
+
+
+
+
+
 
 
 
