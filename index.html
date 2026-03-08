@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <title>Hopp Høyest</title>
-  <link rel="stylesheet" href="style.css?v=20260308-14">
+  <link rel="stylesheet" href="style.css?v=20260308-15">
 </head>
 <body>
   <main class="game-shell">
@@ -30,6 +30,14 @@
     </section>
 
     <canvas id="game" width="420" height="720" aria-label="Spillflate"></canvas>
+    <button id="pauseMenuBtn" class="pause-menu-btn" type="button" aria-label="Apne innstillinger">II</button>
+    <div id="settingsPanel" class="settings-panel hidden" aria-label="Innstillinger">
+      <h2>Innstillinger</h2>
+      <label class="settings-label" for="moveSpeedSlider">Bevegelseshastighet</label>
+      <input id="moveSpeedSlider" class="settings-slider" type="range" min="0.70" max="1.80" step="0.05" value="1.00">
+      <p class="settings-value">Nivaa: <span id="moveSpeedValue">1.00</span>x</p>
+      <button id="settingsResume" class="settings-close" type="button">Fortsett</button>
+    </div>
 
     <section class="help">
       <p>Mobil: swipe sidelengs. Rask swipe gir raskere sidefart, men med maksfart.</p>
@@ -108,10 +116,12 @@
     </div>
   </main>
 
-  <script src="config.js?v=20260308-14"></script>
-  <script src="game.js?v=20260308-14"></script>
+  <script src="config.js?v=20260308-15"></script>
+  <script src="game.js?v=20260308-15"></script>
 </body>
 </html>
+
+
 
 
 

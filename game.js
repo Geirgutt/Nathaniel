@@ -23,6 +23,11 @@ const skinsSectionEl = document.getElementById("skinsSection");
 const mapsSectionEl = document.getElementById("mapsSection");
 const skillsSectionEl = document.getElementById("skillsSection");
 const shopCategoryEls = Array.from(document.querySelectorAll(".shop-category"));
+const pauseMenuBtnEl = document.getElementById("pauseMenuBtn");
+const settingsPanelEl = document.getElementById("settingsPanel");
+const settingsResumeEl = document.getElementById("settingsResume");
+const moveSpeedSliderEl = document.getElementById("moveSpeedSlider");
+const moveSpeedValueEl = document.getElementById("moveSpeedValue");
 
 const width = canvas.width;
 const height = canvas.height;
@@ -41,6 +46,7 @@ const runnerGroundY = height - 118;
 const bestScoreKey = "hopp-hoyest-best";
 const playerNameKey = "hopp-hoyest-player-name";
 const localLeaderboardKey = "hopp-hoyest-local-leaderboard";
+const controlSpeedKey = "hopp-hoyest-control-speed";
 const progressionKey = "hopp-hoyest-progression-v1";
 const coinsPerLevel = 12;
 const leaderboardLimit = 10;
@@ -232,6 +238,8 @@ const state = {
   progression: null,
   keys: { left: false, right: false },
   touch: { active: false, pointerId: null, startX: 0, lastX: 0, lastTime: 0 },
+  controlSpeed: clamp(Number(localStorage.getItem(controlSpeedKey)) || 1, 0.7, 1.8),
+  pausedBySettings: false,
   player: null,
   platforms: [],
   collectibles: [],
@@ -470,6 +478,7 @@ function selectOwned(kind, id) {
   }
   saveProgression();
   renderShop();
+updateControlSpeedUi();
 }
 
 function purchase(kind, id) {
@@ -511,6 +520,7 @@ function unlockBananaIfNeeded(score) {
   state.progression.ownedSkills = uniqueList(state.progression.ownedSkills);
   saveProgression();
   renderShop();
+updateControlSpeedUi();
   updateProfileBar();
   addFloatingText("MYSTISK BANAN LASES OPP!", width / 2, state.cameraY + 180, "#ffe066", 90);
   return true;
@@ -633,6 +643,7 @@ async function submitScore() {
     setScoreStatus("Score lagret lokalt.");
     scoreEntryEl.classList.add("hidden");
     renderShop();
+updateControlSpeedUi();
     return;
   }
 
@@ -676,6 +687,7 @@ function showStartOverlay() {
   leaderboardPanelEl.classList.add("hidden");
   saveScoreEl.disabled = false;
   renderShop();
+updateControlSpeedUi();
   setOverlay("Start rolig, samle coins og bygg opp banken din. Portal-run venter ved 2000 meter.", "Start spill", true);
 }
 
@@ -686,6 +698,7 @@ async function showGameOverOverlay() {
   saveScoreEl.disabled = false;
   unlockBananaIfNeeded(score);
   renderShop();
+updateControlSpeedUi();
 
   const scores = await fetchLeaderboard();
   const qualifies = qualifiesForLeaderboard(score);
@@ -1196,8 +1209,8 @@ function updateJumperPlayer() {
   const player = state.player;
   const difficulty = getRunDifficulty();
   const moveIntent = getMoveIntent();
-  const airAcceleration = 0.36 + difficulty * 0.08 + (isSpeedSkillActive() ? 0.11 : 0) + (isBananaActive() ? 0.06 : 0);
-  const maxMoveSpeed = moveSpeed + difficulty * 0.62 + (isSpeedSkillActive() ? 1.15 : 0) + (isBananaActive() ? 0.45 : 0);
+  const airAcceleration = (0.36 + difficulty * 0.08 + (isSpeedSkillActive() ? 0.11 : 0) + (isBananaActive() ? 0.06 : 0)) * (state.controlSpeed || 1);
+  const maxMoveSpeed = (moveSpeed + difficulty * 0.62 + (isSpeedSkillActive() ? 1.15 : 0) + (isBananaActive() ? 0.45 : 0)) * (state.controlSpeed || 1);
   const touchSpeedCap = state.touch.active && isCoarsePointer ? maxMoveSpeed * 1.24 : maxMoveSpeed;
 
   player.bounceSquash *= 0.84;
@@ -1720,6 +1733,7 @@ function startGame() {
   scoreEntryEl.classList.add("hidden");
   leaderboardPanelEl.classList.add("hidden");
   setOverlay("", "", false);
+  closeSettingsMenu();
   state.player.vy = getJumpVelocity();
 
   if (state.progression.selectedSkill === "frog_hop") {
@@ -1908,14 +1922,82 @@ playerNameEl.addEventListener("input", () => {
   localStorage.setItem(playerNameKey, cleanName);
 });
 
+
+function updateControlSpeedUi() {
+  if (moveSpeedSliderEl) {
+    moveSpeedSliderEl.value = state.controlSpeed.toFixed(2);
+  }
+  if (moveSpeedValueEl) {
+    moveSpeedValueEl.textContent = state.controlSpeed.toFixed(2);
+  }
+}
+
+function openSettingsMenu() {
+  if (!settingsPanelEl || !settingsPanelEl.classList.contains("hidden")) {
+    return;
+  }
+  settingsPanelEl.classList.remove("hidden");
+  if (state.running) {
+    state.running = false;
+    state.pausedBySettings = true;
+  }
+}
+
+function closeSettingsMenu() {
+  if (!settingsPanelEl || settingsPanelEl.classList.contains("hidden")) {
+    return;
+  }
+  settingsPanelEl.classList.add("hidden");
+  if (state.pausedBySettings) {
+    state.running = true;
+    state.pausedBySettings = false;
+    state.lastFrameTime = 0;
+  }
+}
+
+if (pauseMenuBtnEl) {
+  pauseMenuBtnEl.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (settingsPanelEl && settingsPanelEl.classList.contains("hidden")) {
+      openSettingsMenu();
+    } else {
+      closeSettingsMenu();
+    }
+  });
+}
+
+if (settingsResumeEl) {
+  settingsResumeEl.addEventListener("click", (event) => {
+    event.preventDefault();
+    closeSettingsMenu();
+  });
+}
+
+if (moveSpeedSliderEl) {
+  moveSpeedSliderEl.addEventListener("input", () => {
+    const value = clamp(Number(moveSpeedSliderEl.value) || 1, 0.7, 1.8);
+    state.controlSpeed = value;
+    localStorage.setItem(controlSpeedKey, value.toFixed(2));
+    updateControlSpeedUi();
+  });
+}
 state.progression = loadProgression();
 applyBodyTheme();
 resetGame();
 showStartOverlay();
 updateHud();
 renderShop();
+updateControlSpeedUi();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
+
+
+
+
+
+
 
 
 
