@@ -1,4 +1,4 @@
-const canvas = document.getElementById("game");
+﻿const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true }) || canvas.getContext("2d");
 const scoreEl = document.getElementById("score");
 const coinsEl = document.getElementById("coins");
@@ -51,7 +51,7 @@ const skins = {
   starter: {
     id: "starter",
     name: "Sky Kid",
-    description: "Klassisk helt med r�d kappe.",
+    description: "Klassisk helt med rød kappe.",
     cost: 0,
     colors: { body: "#1f3c88", cape: "#ff5f6d", visor: "#7dd3fc", accent: "#0f172a" }
   },
@@ -169,13 +169,13 @@ const skills = {
   superspeed: {
     id: "superspeed",
     name: "Superspeed",
-    description: "Kvassere styring og h�yere toppfart en stund.",
+    description: "Kvassere styring og høyere toppfart en stund.",
     cost: 95
   },
   banana: {
     id: "banana",
     name: "Mystisk banan",
-    description: "Ingen vet hva den egentlig gj�r. Lases opp ved 5000 m.",
+    description: "Ingen vet hva den egentlig gjør. Låses opp ved 5000 m.",
     cost: 0,
     unlockScore: 5000
   }
@@ -390,7 +390,7 @@ function renderShopCards(container, items, kind) {
       (kind === "skill" && state.progression.selectedSkill === item.id);
     const lockedByScore = Boolean(item.unlockScore && state.bestScore < item.unlockScore && !ownedItem);
 
-    let label = "Kjop";
+    let label = "Kjøp";
     let extraClass = "";
     if (selected) {
       label = "Valgt";
@@ -411,7 +411,7 @@ function renderShopCards(container, items, kind) {
           <strong>${item.name}</strong>
           <p>${item.description}</p>
           <div class="shop-meta">
-            <span>${ownedItem ? "Eid" : lockedByScore ? "Lases opp senere" : `Pris: ${item.cost}`}</span>
+            <span>${ownedItem ? "Eid" : lockedByScore ? "Låses opp senere" : `Pris: ${item.cost}`}</span>
           </div>
         </div>
         <button
@@ -559,7 +559,7 @@ async function fetchLeaderboard() {
   if (!hasSupabaseConfig()) {
     const scores = readLocalLeaderboard();
     renderLeaderboard(scores);
-    setScoreStatus("Fyll inn Supabase i config.js for delt toppliste. Viser lokal liste forelopig.");
+    setScoreStatus("Fyll inn Supabase i config.js for delt toppliste. Viser lokal liste foreløpig.");
     return scores;
   }
 
@@ -603,7 +603,7 @@ async function submitScore() {
 
   const name = getPlayerName();
   if (!name) {
-    setScoreStatus("Skriv inn kallenavn for a lagre score.");
+    setScoreStatus("Skriv inn kallenavn for å lagre score.");
     playerNameEl.focus();
     return;
   }
@@ -693,7 +693,7 @@ async function showGameOverOverlay() {
     setScoreStatus("Ikke top 10 denne gangen, men her er lista.");
   }
 
-  setOverlay(`Du kom til level ${state.level} og nadde ${score} meter. Banken din er pa ${state.progression.bankCoins} coins.`, "Prov igjen", true);
+  setOverlay(`Du kom til level ${state.level} og nådde ${score} meter. Banken din er på ${state.progression.bankCoins} coins.`, "Prøv igjen", true);
 }
 function ensureMusic() {
   if (music.context) {
@@ -1925,6 +1925,9 @@ updateHud();
 renderShop();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
+
 
 
 
