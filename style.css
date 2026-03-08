@@ -1,4 +1,4 @@
-﻿* {
+* {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
 }
@@ -300,4 +300,36 @@ button,
     height: auto;
     max-height: 720px;
   }
+}
+
+
+.overlay {
+  overflow: hidden;
+}
+
+.overlay,
+.panel,
+.shop,
+.leaderboard-list {
+  touch-action: pan-y;
+}
+
+.panel {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 22px 22px 14px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.panel-actions {
+  position: sticky;
+  bottom: -14px;
+  margin: 8px -22px -14px;
+  padding: 14px 22px calc(14px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.96) 32%, rgba(255, 255, 255, 0.99) 100%);
+}
+
+#action {
+  width: 100%;
 }

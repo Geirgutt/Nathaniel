@@ -1779,11 +1779,17 @@ window.addEventListener("keyup", (event) => {
   }
 });
 
-for (const element of [document.body, canvas, overlayEl]) {
+for (const element of [document.body, canvas]) {
   element.addEventListener("touchmove", (event) => {
     event.preventDefault();
   }, { passive: false });
 }
+
+overlayEl.addEventListener("touchmove", (event) => {
+  if (!event.target.closest(".panel")) {
+    event.preventDefault();
+  }
+}, { passive: false });
 
 canvas.addEventListener("pointerdown", (event) => {
   event.preventDefault();
@@ -1848,7 +1854,11 @@ overlayEl.addEventListener("click", (event) => {
   purchase(kind, id);
 });
 
-actionEl.addEventListener("click", startGame);
+actionEl.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  startGame();
+});
 saveScoreEl.addEventListener("click", submitScore);
 
 playerNameEl.value = localStorage.getItem(playerNameKey) || "";
@@ -1868,3 +1878,4 @@ updateHud();
 renderShop();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
