@@ -248,6 +248,7 @@ const state = {
     bananaTriggered: false,
     bananaPulseUntil: 0
   },
+  shopCategory: "skins",
   runner: {
     triggered: false,
     completed: false,
@@ -369,6 +370,17 @@ function updateProfileBar() {
 
 function applyBodyTheme() {
   document.body.style.background = getSelectedMap().theme.bodyBackground;
+}
+
+function setShopCategory(category) {
+  state.shopCategory = category;
+  skinsSectionEl.classList.toggle("hidden", category !== "skins");
+  mapsSectionEl.classList.toggle("hidden", category !== "maps");
+  skillsSectionEl.classList.toggle("hidden", category !== "skills");
+
+  for (const button of shopCategoryEls) {
+    button.classList.toggle("active", button.dataset.category === category);
+  }
 }
 function renderShopCards(container, items, kind) {
   container.innerHTML = Object.values(items).map((item) => {
@@ -1849,6 +1861,12 @@ canvas.addEventListener("pointercancel", releasePointer);
 canvas.addEventListener("lostpointercapture", releasePointer);
 
 overlayEl.addEventListener("click", (event) => {
+  const categoryButton = event.target.closest(".shop-category");
+  if (categoryButton) {
+    setShopCategory(categoryButton.dataset.category);
+    return;
+  }
+
   const button = event.target.closest(".shop-button");
   if (!button) {
     return;
@@ -1887,6 +1905,9 @@ updateHud();
 renderShop();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
+
 
 
 

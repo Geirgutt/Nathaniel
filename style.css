@@ -343,3 +343,27 @@ body {
 #game {
   touch-action: none;
 }
+
+.shop-categories {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.shop-category {
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  color: #17324d;
+  background: rgba(23, 50, 77, 0.08);
+}
+
+.shop-category.active {
+  color: white;
+  background: linear-gradient(135deg, #17324d, #2e5d88);
+}
+
+.shop-section.hidden {
+  display: none;
+}

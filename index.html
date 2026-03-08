@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <title>Hopp Høyest</title>
-  <link rel="stylesheet" href="style.css?v=20260308-6">
+  <link rel="stylesheet" href="style.css?v=20260308-7">
 </head>
 <body>
   <main class="game-shell">
@@ -70,7 +70,13 @@
         </section>
 
         <section id="shopPanel" class="shop" aria-label="Butikk og unlocks">
-          <div class="shop-section">
+          <div class="shop-categories" role="tablist" aria-label="Shop-kategorier">
+            <button class="shop-category active" type="button" data-category="skins">Skins</button>
+            <button class="shop-category" type="button" data-category="maps">Maps</button>
+            <button class="shop-category" type="button" data-category="skills">Skills</button>
+          </div>
+
+          <div id="skinsSection" class="shop-section">
             <div class="shop-title-row">
               <h2>Skins</h2>
               <p class="shop-hint">Velg stil for figuren.</p>
@@ -78,7 +84,7 @@
             <div id="skinsShop" class="shop-grid"></div>
           </div>
 
-          <div class="shop-section">
+          <div id="mapsSection" class="shop-section hidden">
             <div class="shop-title-row">
               <h2>Maps</h2>
               <p class="shop-hint">Ny bakgrunn og ny musikk.</p>
@@ -86,7 +92,7 @@
             <div id="mapsShop" class="shop-grid"></div>
           </div>
 
-          <div class="shop-section">
+          <div id="skillsSection" class="shop-section hidden">
             <div class="shop-title-row">
               <h2>Skills</h2>
               <p class="shop-hint">Velg en skill per runde.</p>
@@ -102,10 +108,11 @@
     </div>
   </main>
 
-  <script src="config.js?v=20260308-6"></script>
-  <script src="game.js?v=20260308-6"></script>
+  <script src="config.js?v=20260308-7"></script>
+  <script src="game.js?v=20260308-7"></script>
 </body>
 </html>
+
 
 
 
