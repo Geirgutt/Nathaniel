@@ -7,4 +7,6 @@
 5. Fyll inn `url` og `publishableKey` i `config.js`.
 6. Commit og push til GitHub Pages.
 
-Leaderboarden lagres da i Supabase og blir ikke borte når du oppdaterer spillet.
+Hvis score ikke lagres, kjør SQL-en i `supabase.sql` pa nytt. Den gir `anon` og `authenticated` eksplisitt `select`- og `insert`-tilgang pa `public.scores`, i tillegg til RLS-policyene.
+
+Leaderboarden lagres da i Supabase og blir ikke borte nar du oppdaterer spillet.

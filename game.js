@@ -18,6 +18,9 @@ const leaderboardPanelEl = document.getElementById("leaderboardPanel");
 
 const width = canvas.width;
 const height = canvas.height;
+const fixedStepMs = 1000 / 60;
+const maxFrameDeltaMs = 100;
+const maxUpdatesPerFrame = 4;
 const moveSpeed = 2.8;
 const baseJumpVelocity = -10.9;
 const basePlatformWidth = 88;
@@ -64,7 +67,9 @@ const state = {
   player: null,
   platforms: [],
   collectibles: [],
-  floatingTexts: []
+  floatingTexts: [],
+  lastFrameTime: 0,
+  accumulator: 0
 };
 
 function rand(min, max) {
@@ -125,6 +130,15 @@ function qualifiesForLeaderboard(score) {
   return score >= lastScore;
 }
 
+async function parseErrorDetails(response) {
+  try {
+    const data = await response.json();
+    return data.message || data.error_description || data.hint || JSON.stringify(data);
+  } catch {
+    return `HTTP ${response.status}`;
+  }
+}
+
 async function fetchLeaderboard() {
   if (!hasSupabaseConfig()) {
     const scores = readLocalLeaderboard();
@@ -150,17 +164,18 @@ async function fetchLeaderboard() {
     });
 
     if (!response.ok) {
-      throw new Error(`Leaderboard-feil: ${response.status}`);
+      const details = await parseErrorDetails(response);
+      throw new Error(details);
     }
 
     const scores = await response.json();
     renderLeaderboard(scores);
     setScoreStatus("Toppliste.");
     return scores;
-  } catch {
+  } catch (error) {
     const scores = readLocalLeaderboard();
     renderLeaderboard(scores);
-    setScoreStatus("Kunne ikke hente Supabase-toppliste. Viser lokal liste.");
+    setScoreStatus(`Kunne ikke hente Supabase-toppliste. Viser lokal liste. ${error.message || ""}`.trim());
     return scores;
   }
 }
@@ -215,16 +230,17 @@ async function submitScore() {
     });
 
     if (!response.ok) {
-      throw new Error(`Lagringsfeil: ${response.status}`);
+      const details = await parseErrorDetails(response);
+      throw new Error(details);
     }
 
     scoreEntryEl.classList.add("hidden");
     setScoreStatus("Score lagret.");
     await fetchLeaderboard();
-  } catch {
+  } catch (error) {
     state.scoreSubmitted = false;
     saveScoreEl.disabled = false;
-    setScoreStatus("Kunne ikke lagre score.");
+    setScoreStatus(`Kunne ikke lagre score. ${error.message || ""}`.trim());
   }
 }
 
@@ -450,6 +466,7 @@ function resetGame() {
   state.coins = 0;
   state.level = 1;
   state.scoreSubmitted = false;
+  state.accumulator = 0;
   state.platforms = [];
   state.collectibles = [];
   state.floatingTexts = [];
@@ -595,6 +612,16 @@ function updatePlayer() {
   }
 }
 
+function stepSimulation() {
+  updateFloatingTexts();
+
+  if (state.running) {
+    updatePlatforms();
+    updatePlayer();
+    spawnPlatforms();
+  }
+}
+
 function drawBackground() {
   ctx.clearRect(0, 0, width, height);
 
@@ -676,22 +703,37 @@ function drawPlayer() {
   ctx.fillRect(player.x + 21, screenY + 24, 8, 10);
 }
 
-function loop() {
+function drawFrame() {
   drawBackground();
   drawPlatforms();
   drawCollectibles();
   drawPlayer();
   drawFloatingTexts();
+}
 
-  updateMusic();
-  updateFloatingTexts();
-
-  if (state.running) {
-    updatePlatforms();
-    updatePlayer();
-    spawnPlatforms();
+function loop(timestamp) {
+  if (!state.lastFrameTime) {
+    state.lastFrameTime = timestamp;
   }
 
+  const frameDelta = Math.min(maxFrameDeltaMs, timestamp - state.lastFrameTime);
+  state.lastFrameTime = timestamp;
+  state.accumulator += frameDelta;
+
+  updateMusic();
+
+  let updates = 0;
+  while (state.accumulator >= fixedStepMs && updates < maxUpdatesPerFrame) {
+    stepSimulation();
+    state.accumulator -= fixedStepMs;
+    updates += 1;
+  }
+
+  if (updates === maxUpdatesPerFrame) {
+    state.accumulator = 0;
+  }
+
+  drawFrame();
   requestAnimationFrame(loop);
 }
 
@@ -699,6 +741,7 @@ function startGame() {
   ensureMusic();
   resetGame();
   state.running = true;
+  state.lastFrameTime = 0;
   scoreEntryEl.classList.add("hidden");
   leaderboardPanelEl.classList.add("hidden");
   setOverlay("", "", false);
@@ -785,4 +828,4 @@ resetGame();
 showStartOverlay();
 updateHud();
 fetchLeaderboard();
-loop();
+requestAnimationFrame(loop);
