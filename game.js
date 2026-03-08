@@ -26,8 +26,6 @@ const shopCategoryEls = Array.from(document.querySelectorAll(".shop-category"));
 const pauseMenuBtnEl = document.getElementById("pauseMenuBtn");
 const settingsPanelEl = document.getElementById("settingsPanel");
 const settingsResumeEl = document.getElementById("settingsResume");
-const moveSpeedSliderEl = document.getElementById("moveSpeedSlider");
-const moveSpeedValueEl = document.getElementById("moveSpeedValue");
 const controlModeSwipeEl = document.getElementById("controlModeSwipe");
 const controlModeButtonsEl = document.getElementById("controlModeButtons");
 const touchButtonsEl = document.getElementById("touchButtons");
@@ -51,10 +49,10 @@ const runnerGroundY = height - 118;
 const bestScoreKey = "hopp-hoyest-best";
 const playerNameKey = "hopp-hoyest-player-name";
 const localLeaderboardKey = "hopp-hoyest-local-leaderboard";
-const legacyControlSpeedKey = "hopp-hoyest-control-speed";
-const controlSpeedKey = "hopp-hoyest-control-speed-v2";
 const controlModeKey = "hopp-hoyest-control-mode";
 const controlSpeedBase = 1.8;
+const buttonSpeedScale = 0.75;
+const swipeSpeedScale = 1.0;
 const progressionKey = "hopp-hoyest-progression-v1";
 const coinsPerLevel = 12;
 const leaderboardLimit = 10;
@@ -246,7 +244,6 @@ const state = {
   progression: null,
   keys: { left: false, right: false },
   touch: { active: false, pointerId: null, startX: 0, lastX: 0, lastTime: 0, lastSwipeSpeed: 0 },
-  controlSpeed: loadControlSpeedSetting(),
   controlMode: loadControlModeSetting(),
   pausedBySettings: false,
   player: null,
@@ -295,26 +292,12 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
-function loadControlSpeedSetting() {
-  const saved = Number(localStorage.getItem(controlSpeedKey));
-  if (Number.isFinite(saved) && saved > 0) {
-    return clamp(saved, 0.5, 1.6);
-  }
-
-  const legacy = Number(localStorage.getItem(legacyControlSpeedKey));
-  if (Number.isFinite(legacy) && legacy > 0) {
-    return clamp(legacy / controlSpeedBase, 0.5, 1.6);
-  }
-
-  return 1;
-}
-
 function loadControlModeSetting() {
   return localStorage.getItem(controlModeKey) === "swipe" ? "swipe" : "buttons";
 }
 
 function getControlSpeedMultiplier() {
-  return (state.controlSpeed || 1) * controlSpeedBase;
+  return controlSpeedBase * (state.controlMode === "buttons" ? buttonSpeedScale : swipeSpeedScale);
 }
 
 function sanitizeName(name) {
@@ -1811,7 +1794,9 @@ function applyTouchSwipe(x, timeStamp) {
 function clearTouchInput() {
   state.touch.active = false;
   state.touch.pointerId = null;
-  state.touch.startX = 0;
+  state.touch.startX = 0;
+
+
   state.touch.lastX = 0;
   state.touch.lastTime = 0;
   state.touch.lastSwipeSpeed = 0;
@@ -1999,23 +1984,15 @@ playerNameEl.addEventListener("input", () => {
 });
 
 
-function updateControlSpeedUi() {
-  if (moveSpeedSliderEl) {
-    moveSpeedSliderEl.value = state.controlSpeed.toFixed(2);
-  }
-  if (moveSpeedValueEl) {
-    moveSpeedValueEl.textContent = state.controlSpeed.toFixed(2);
-  }
-}
 
 function positionTouchButtons() {
   if (!touchButtonsEl) {
     return;
   }
 
-  const leftInset = canvas.offsetLeft + 10;
-  const topPos = canvas.offsetTop + canvas.clientHeight - 108;
-  const widthPx = Math.max(120, canvas.clientWidth - 20);
+  const leftInset = canvas.offsetLeft + 8;
+  const topPos = canvas.offsetTop + canvas.clientHeight - 66;
+  const widthPx = Math.max(120, canvas.clientWidth - 16);
 
   touchButtonsEl.style.left = `${leftInset}px`;
   touchButtonsEl.style.width = `${widthPx}px`;
@@ -2098,14 +2075,6 @@ if (settingsResumeEl) {
   });
 }
 
-if (moveSpeedSliderEl) {
-  moveSpeedSliderEl.addEventListener("input", () => {
-    const value = clamp(Number(moveSpeedSliderEl.value) || 1, 0.5, 1.6);
-    state.controlSpeed = value;
-    localStorage.setItem(controlSpeedKey, value.toFixed(2));
-    updateControlSpeedUi();
-  });
-}
 
 if (controlModeSwipeEl) {
   controlModeSwipeEl.addEventListener("click", () => {
@@ -2133,11 +2102,15 @@ resetGame();
 showStartOverlay();
 updateHud();
 renderShop();
-updateControlSpeedUi();
 updateControlModeUi();
 updateTouchButtonsVisibility();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
+
+
+
 
 
 

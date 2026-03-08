@@ -29,7 +29,7 @@ body {
   min-height: 100vh;
   padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
   background: rgba(255, 255, 255, 0.42);
   box-shadow: 0 18px 60px rgba(23, 50, 77, 0.18);
@@ -41,7 +41,6 @@ body {
 }
 
 .hud,
-.help,
 .profile-bar,
 .shop-title-row {
   display: flex;
@@ -60,7 +59,6 @@ body {
 
 .label,
 .value,
-.help p,
 .score-status,
 .shop-hint,
 .shop-title-row h2 {
@@ -95,12 +93,6 @@ body {
   background: linear-gradient(180deg, #89d3ff 0%, #d6f2ff 55%, #fff7da 100%);
   touch-action: none;
   transform: translateZ(0);
-}
-
-.help {
-  font-size: 0.92rem;
-  flex-direction: column;
-  color: rgba(23, 50, 77, 0.82);
 }
 
 .overlay {
@@ -302,7 +294,6 @@ button,
   }
 }
 
-
 .overlay {
   overflow: hidden;
 }
@@ -377,21 +368,13 @@ body {
 }
 
 #game {
-  height: min(calc(100dvh - 132px), 860px);
+  height: min(calc(100dvh - 88px), 860px);
   min-height: 72vh;
-}
-
-.help {
-  font-size: 0.82rem;
-  gap: 4px;
 }
 
 .hud {
   gap: 8px;
 }
-
-
-
 
 @media (pointer: coarse) {
   .panel-actions {
@@ -492,20 +475,20 @@ body {
   z-index: 8;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
   pointer-events: none;
 }
 
 .touch-pad {
   width: 100%;
-  height: 96px;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  background: rgba(20, 47, 75, 0.22);
+  height: 68px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(20, 47, 75, 0.12);
   color: #ffffff;
-  font-size: 2rem;
+  font-size: 1.6rem;
   line-height: 1;
-  box-shadow: 0 10px 22px rgba(10, 26, 44, 0.28);
+  box-shadow: 0 6px 14px rgba(10, 26, 44, 0.2);
   backdrop-filter: blur(6px);
   pointer-events: auto;
   touch-action: none;
@@ -515,6 +498,9 @@ body {
 }
 
 .touch-pad:active {
-  background: rgba(20, 47, 75, 0.55);
+  background: rgba(20, 47, 75, 0.2);
 }
+
+
+
 
