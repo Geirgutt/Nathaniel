@@ -98,6 +98,7 @@ body {
 .overlay {
   position: absolute;
   inset: 0;
+  z-index: 20;
   display: grid;
   place-items: center;
   padding: 18px;
@@ -500,6 +501,7 @@ body {
 .touch-pad:active {
   background: rgba(20, 47, 75, 0.2);
 }
+
 
 
 
