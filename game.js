@@ -803,14 +803,14 @@ function activateJetpack(power = -17, duration = jetpackDurationMs) {
 
 function activateBananaSurprise() {
   state.skillState.bananaTriggered = true;
-  state.effects.bananaUntil = state.elapsedMs + 7000;
-  state.skillState.bananaPulseUntil = state.elapsedMs + 7000;
-  activateDisco(7000);
-  activateJetpack(-18.4, 1000);
-  state.progression.bankCoins += 12;
+  state.effects.bananaUntil = state.elapsedMs + 11000;
+  state.skillState.bananaPulseUntil = state.elapsedMs + 11000;
+  activateDisco(11000);
+  activateJetpack(-20.2, 1300);
+  state.progression.bankCoins += 30;
   saveProgression();
   updateProfileBar();
-  addFloatingText("BANANAMANIA!", width / 2, state.cameraY + 200, "#ffe066", 90);
+  addFloatingText("BANANAMANIA MAX!", width / 2, state.cameraY + 200, "#ffe066", 105);
 }
 
 function scheduleTone(type, frequency, startTime, duration, gainNode, volume) {
@@ -906,7 +906,8 @@ function addFloatingText(text, x, y, color, life = 50) {
 }
 
 function maybeCreateCollectible(platform) {
-  if (Math.random() > 0.4) {
+  const baseChance = isBananaActive() ? 0.94 : 0.4;
+  if (Math.random() > baseChance) {
     return;
   }
 
@@ -919,8 +920,22 @@ function maybeCreateCollectible(platform) {
     collected: false
   });
 
+  if (isBananaActive()) {
+    const bananaBurst = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < bananaBurst; i += 1) {
+      state.collectibles.push({
+        type: "coin",
+        x: clamp(platform.x + platform.w / 2 + rand(-platform.w * 0.45, platform.w * 0.45), 18, width - 18),
+        y: platform.y - rand(42, 96),
+        r: 10,
+        value: 1,
+        collected: false
+      });
+    }
+  }
+
   const difficulty = getRunDifficulty();
-  const powerupChance = 0.06 + difficulty * 0.08;
+  const powerupChance = 0.06 + difficulty * 0.08 + (isBananaActive() ? 0.14 : 0);
   if (Math.random() < powerupChance) {
     const type = Math.random() < 0.5 ? "disco" : "jetpack";
     state.collectibles.push({
@@ -938,6 +953,7 @@ function createPlatform(y, guaranteedCenter = false, previousPlatform = null) {
   const difficulty = getRunDifficulty();
   const movingChance = guaranteedCenter ? 0 : clamp((difficulty - 0.05) * 0.58, 0, 0.55);
   const crackedChance = guaranteedCenter ? 0 : clamp((difficulty - 0.2) * 0.34, 0, 0.3);
+  const bananaPeelChance = (guaranteedCenter || !isBananaActive()) ? 0 : clamp(0.22 + difficulty * 0.08, 0.2, 0.46);
   const maxOffset = 80 + difficulty * 42;
 
   let x;
@@ -955,6 +971,8 @@ function createPlatform(y, guaranteedCenter = false, previousPlatform = null) {
     h: platformHeight,
     vx: Math.random() < movingChance ? rand(0.3, 0.65 + difficulty * 0.3) * (Math.random() < 0.5 ? -1 : 1) : 0,
     cracked: Math.random() < crackedChance,
+    peel: Math.random() < bananaPeelChance,
+    peelUsed: false,
     broken: false
   };
 
@@ -1157,7 +1175,7 @@ function collectPickups() {
       item.collected = true;
 
       if (item.type === "coin") {
-        const bonus = isDiscoActive() ? 2 : 1;
+        const bonus = isDiscoActive() ? 2 : isBananaActive() ? 3 : 1;
         state.coins += bonus;
         state.progression.bankCoins += bonus;
         saveProgression();
@@ -1223,8 +1241,8 @@ function updateJumperPlayer() {
   const difficulty = getRunDifficulty();
   const moveIntent = getMoveIntent();
   const controlMult = getControlSpeedMultiplier();
-  const airAcceleration = (0.36 + difficulty * 0.08 + (isSpeedSkillActive() ? 0.11 : 0) + (isBananaActive() ? 0.06 : 0)) * controlMult;
-  const maxMoveSpeed = (moveSpeed + difficulty * 0.62 + (isSpeedSkillActive() ? 1.15 : 0) + (isBananaActive() ? 0.45 : 0)) * controlMult;
+  const airAcceleration = (0.36 + difficulty * 0.08 + (isSpeedSkillActive() ? 0.11 : 0) + (isBananaActive() ? 0.18 : 0)) * controlMult;
+  const maxMoveSpeed = (moveSpeed + difficulty * 0.62 + (isSpeedSkillActive() ? 1.15 : 0) + (isBananaActive() ? 2.2 : 0)) * controlMult;
   const touchSpeedCap = state.touch.active && isCoarsePointer ? maxMoveSpeed * 1.24 : maxMoveSpeed;
 
   player.bounceSquash *= 0.84;
@@ -1270,6 +1288,13 @@ function updateJumperPlayer() {
 
       if (platform.vx) {
         player.x += platform.vx * 0.6;
+      }
+
+      if (platform.peel && !platform.peelUsed) {
+        platform.peelUsed = true;
+        const slipKick = rand(3.2, 5.1) * (Math.random() < 0.5 ? -1 : 1);
+        player.vx = clamp(player.vx + slipKick, -touchSpeedCap * 1.1, touchSpeedCap * 1.1);
+        addFloatingText("SKLIII!", platform.x + platform.w / 2, platform.y - 10, "#ffe066", 44);
       }
 
       if (platform.cracked) {
@@ -1503,6 +1528,20 @@ function drawPlatforms() {
       ctx.lineTo(platform.x + platform.w - 12, screenY + 3);
       ctx.stroke();
     }
+    if (platform.peel && !platform.peelUsed) {
+      const peelX = platform.x + platform.w * 0.5;
+      const peelY = screenY - 4;
+      ctx.fillStyle = "#ffe066";
+      ctx.beginPath();
+      ctx.ellipse(peelX, peelY, 11, 6, -0.24, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#d99b00";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(peelX, peelY, 9, 0.4, 2.7);
+      ctx.stroke();
+    }
+
   }
 }
 
@@ -2106,6 +2145,22 @@ updateControlModeUi();
 updateTouchButtonsVisibility();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
