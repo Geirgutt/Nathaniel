@@ -47,14 +47,16 @@ const runnerIntervalScore = 1000;
 const runnerBonusScore = 180;
 const runnerCrashPenalty = 120;
 const runnerGroundY = height - 118;
-const bestScoreKey = "hopp-hoyest-best";
+const saveVersion = "1.0";
+const storageKey = (name) => `hopp-hoyest-${name}-v${saveVersion}`;
+const bestScoreKey = storageKey("best");
 const playerNameKey = "hopp-hoyest-player-name";
-const localLeaderboardKey = "hopp-hoyest-local-leaderboard";
+const localLeaderboardKey = storageKey("local-leaderboard");
 const controlModeKey = "hopp-hoyest-control-mode";
 const controlSpeedBase = 1.8;
 const buttonSpeedScale = 0.75;
 const swipeSpeedScale = 1.0;
-const progressionKey = "hopp-hoyest-progression-v1";
+const progressionKey = storageKey("progression");
 const coinsPerLevel = 12;
 const leaderboardLimit = 10;
 const discoDurationMs = 8000;
@@ -2739,5 +2741,4 @@ updateControlModeUi();
 updateTouchButtonsVisibility();
 fetchLeaderboard();
 requestAnimationFrame(loop);
-
 
