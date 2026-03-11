@@ -47,6 +47,8 @@ const runnerIntervalScore = 1000;
 const runnerBonusScore = 180;
 const runnerCrashPenalty = 120;
 const runnerGroundY = height - 118;
+const runnerPlayerX = 72;
+const runnerFailCoinPenalty = 3;
 const saveVersion = "1.0";
 const storageKey = (name) => `hopp-hoyest-${name}-v${saveVersion}`;
 const bestScoreKey = storageKey("best");
@@ -567,14 +569,13 @@ function getRunnerVariantConfig() {
   const rules = getMapRules();
   const variant = chooseWeightedOption(rules.runnerVariantWeights);
   const configs = {
-    classic: { id: "classic", label: "Klassisk", speedBonus: 0, portalShift: 0, lowBias: 0.55, pickupBurst: false, reward: 0 },
-    sprint: { id: "sprint", label: "Sprint", speedBonus: 1.15, portalShift: -260, lowBias: 0.72, pickupBurst: false, reward: 2 },
-    tunnel: { id: "tunnel", label: "Dukkesone", speedBonus: 0.4, portalShift: -80, lowBias: 0.2, pickupBurst: false, reward: 3 },
-    coinrush: { id: "coinrush", label: "Myntjag", speedBonus: 0.3, portalShift: 40, lowBias: 0.55, pickupBurst: true, reward: 1 }
+    classic: { id: "classic", label: "Klassisk", speedBonus: 0, portalShift: 180, lowBias: 0.55, pickupBurst: true, pickupSpacing: [300, 420], reward: 4, failPenalty: 2 },
+    sprint: { id: "sprint", label: "Sprint", speedBonus: 1.15, portalShift: 80, lowBias: 0.72, pickupBurst: true, pickupSpacing: [260, 360], reward: 5, failPenalty: 3 },
+    tunnel: { id: "tunnel", label: "Dukkesone", speedBonus: 0.4, portalShift: 160, lowBias: 0.2, pickupBurst: true, pickupSpacing: [280, 390], reward: 6, failPenalty: 2 },
+    coinrush: { id: "coinrush", label: "Myntjag", speedBonus: 0.3, portalShift: 260, lowBias: 0.55, pickupBurst: true, pickupSpacing: [170, 250], reward: 7, failPenalty: 3 }
   };
   return configs[variant] || configs.classic;
 }
-
 function getPlatformType(guaranteedCenter, difficulty) {
   if (guaranteedCenter) {
     return "normal";
@@ -1335,23 +1336,27 @@ function createRunnerPickup(x, y, value = 1) {
 }
 
 function spawnRunnerPickupBurst() {
-  const lane = Math.random() < 0.5 ? "jump" : "ground";
-  const startX = width + rand(90, 150);
-  const count = state.runner.variant === "coinrush" ? 4 : 3;
+  const variant = state.runner.variant;
+  const lane = Math.random() < 0.55 ? "jump" : "ground";
+  const startX = width + rand(130, 240);
+  const count = variant === "coinrush" ? 6 : variant === "sprint" ? 4 : 5;
 
   for (let i = 0; i < count; i += 1) {
-    const offsetY = lane === "jump" ? runnerGroundY - 72 - (i % 2) * 12 : runnerGroundY - 24 - (i % 2) * 6;
-    state.runner.pickups.push(createRunnerPickup(startX + i * 38, offsetY, 1));
+    const arc = lane === "jump" ? Math.sin((i / Math.max(1, count - 1)) * Math.PI) * 16 : 0;
+    const offsetY = lane === "jump" ? runnerGroundY - 74 - arc : runnerGroundY - 24 - (i % 2) * 5;
+    const value = variant === "coinrush" && (i === 0 || i === count - 1) ? 2 : 1;
+    state.runner.pickups.push(createRunnerPickup(startX + i * 42, offsetY, value));
   }
 }
 function createObstacle() {
   const variant = state.runner.variant;
   const lowBias = state.runner.lowBias || 0.55;
+  const spawnX = width + rand(140, 240);
   const type = Math.random() < lowBias ? "low" : "high";
   if (type === "low") {
     return {
       type,
-      x: width + rand(40, 90),
+      x: spawnX,
       y: runnerGroundY,
       w: variant === "sprint" ? rand(26, 40) : rand(30, 46),
       h: variant === "sprint" ? rand(28, 46) : rand(34, 58)
@@ -1360,7 +1365,7 @@ function createObstacle() {
 
   return {
     type,
-    x: width + rand(40, 90),
+    x: spawnX,
     y: runnerGroundY - rand(variant === "tunnel" ? 34 : 28, variant === "tunnel" ? 44 : 34),
     w: rand(40, variant === "tunnel" ? 84 : 62),
     h: rand(18, variant === "tunnel" ? 28 : 24)
@@ -1372,14 +1377,15 @@ function resetRunnerState() {
   const rules = getMapRules();
   const variantConfig = getRunnerVariantConfig();
   state.runner.distance = 0;
-  state.runner.nextObstacleAt = variantConfig.id === "sprint" ? 560 : 700;
-  state.runner.portalDistance = 2600 + (stage - 1) * 260 + rules.runnerPortalShift + variantConfig.portalShift;
+  state.runner.nextObstacleAt = variantConfig.id === "sprint" ? 620 : 760;
+  state.runner.portalDistance = 3200 + (stage - 1) * 320 + rules.runnerPortalShift + variantConfig.portalShift;
   state.runner.variant = variantConfig.id;
   state.runner.variantLabel = variantConfig.label;
   state.runner.pickups = [];
-  state.runner.nextPickupAt = variantConfig.pickupBurst ? 280 : 480;
+  state.runner.nextPickupAt = rand(variantConfig.pickupSpacing[0], variantConfig.pickupSpacing[1]);
   state.runner.clearBonusCoins = variantConfig.reward;
   state.runner.collectedCoins = 0;
+  state.runner.failCoinPenalty = variantConfig.failPenalty;
   state.runner.lowBias = variantConfig.lowBias;
   state.runner.obstacles = [];
   state.runner.portal = null;
@@ -1397,7 +1403,7 @@ function enterRunnerMode() {
   state.effects.discoUntil = 0;
   state.effects.jetpackUntil = 0;
   resetRunnerState();
-  state.player.x = 94;
+  state.player.x = runnerPlayerX;
   state.player.y = runnerGroundY - state.player.h;
   state.player.vx = 0;
   state.player.vy = 0;
@@ -1441,8 +1447,15 @@ function exitRunnerMode(success) {
     if (variantCoinBonus > 0) {
       grantCoins(variantCoinBonus, width / 2, state.cameraY + 170, "#ffe066", `+${variantCoinBonus} banemynter`);
     }
+    addFloatingText(`+${runnerReward} m`, width / 2, state.cameraY + 138, "#9bf6ff", 44);
   } else {
     resetCombo();
+    if ((state.runner.failCoinPenalty || runnerFailCoinPenalty) > 0 && state.coins > 0) {
+      const lostCoins = Math.min(state.coins, state.runner.failCoinPenalty || runnerFailCoinPenalty);
+      state.coins -= lostCoins;
+      addFloatingText(`-${lostCoins} run-mynter`, width / 2, state.cameraY + 170, "#ffadad", 44);
+    }
+    addFloatingText(`-${runnerPenalty} m`, width / 2, state.cameraY + 138, "#ffadad", 44);
   }
   addFloatingText(success ? "PORTALBOOST!" : "TRUFFET!", width / 2, state.cameraY + 200, success ? "#00d1ff" : "#ff6b6b", 70);
   updateHud();
@@ -1808,7 +1821,7 @@ function updateRunnerPlayer() {
 
   player.vy += 0.58;
   player.y += player.vy;
-  player.x = 94;
+  player.x = runnerPlayerX;
   player.bounceSquash *= 0.85;
 
   if (player.y > runnerGroundY - player.h) {
@@ -1817,20 +1830,21 @@ function updateRunnerPlayer() {
   }
 
   if (!runner.portal && runner.distance >= runner.portalDistance) {
-    runner.portal = { x: width + 80, y: runnerGroundY - 96, w: 58, h: 96 };
+    runner.portal = { x: width + 160, y: runnerGroundY - 96, w: 58, h: 96 };
     addFloatingText("PORTAL!", width / 2, runnerGroundY - 120, "#00d1ff", 42);
     clearTouchInput();
   }
 
   if (!runner.portal && runner.distance >= runner.nextObstacleAt) {
     runner.obstacles.push(createObstacle());
-    const baseSpacing = runner.variant === "sprint" ? 300 : 360 - Math.min(120, runner.stage * 18);
-    runner.nextObstacleAt += rand(Math.max(180, baseSpacing), Math.max(280, baseSpacing + 110));
+    const baseSpacing = runner.variant === "sprint" ? 320 : 390 - Math.min(120, runner.stage * 14);
+    runner.nextObstacleAt += rand(Math.max(230, baseSpacing), Math.max(350, baseSpacing + 120));
   }
 
-  if (runner.variant === "coinrush" && runner.distance >= runner.nextPickupAt) {
+  if (!runner.portal && runner.distance >= runner.nextPickupAt) {
     spawnRunnerPickupBurst();
-    runner.nextPickupAt += rand(160, 250);
+    const [minPickupGap, maxPickupGap] = runner.variant === "coinrush" ? [170, 250] : runner.variant === "sprint" ? [260, 360] : [300, 420];
+    runner.nextPickupAt += rand(minPickupGap, maxPickupGap);
   }
 
   for (const obstacle of runner.obstacles) {
@@ -1941,6 +1955,16 @@ function drawBackground() {
       ctx.fillRect(x, 70 + (i % 3) * 36, 46, 14);
     }
 
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i += 1) {
+      const guideY = runnerGroundY - 18 - i * 28;
+      ctx.beginPath();
+      ctx.moveTo(0, guideY);
+      ctx.lineTo(width, guideY - 14);
+      ctx.stroke();
+    }
+
     ctx.fillStyle = "#283618";
     ctx.fillRect(0, runnerGroundY, width, height - runnerGroundY);
     ctx.fillStyle = "#606c38";
@@ -1948,6 +1972,9 @@ function drawBackground() {
       const x = ((i * 30) - offset) % (width + 30) - 30;
       ctx.fillRect(x, runnerGroundY + 6, 16, 4);
     }
+
+    ctx.fillStyle = "rgba(255,255,255,0.08)";
+    ctx.fillRect(runnerPlayerX + 40, runnerGroundY - 112, width - (runnerPlayerX + 52), 118);
     return;
   }
 
@@ -2054,21 +2081,41 @@ function drawPlatforms() {
 function drawCollectibles() {
   if (state.mode === "runner") {
     for (const obstacle of state.runner.obstacles) {
-      ctx.fillStyle = "#bc4749";
-      ctx.fillRect(obstacle.x, obstacle.y - obstacle.h, obstacle.w, obstacle.h);
-      ctx.fillStyle = "#f28482";
-      ctx.fillRect(obstacle.x + 6, obstacle.y - obstacle.h + 8, obstacle.w - 12, 8);
+      const obstacleTop = obstacle.y - obstacle.h;
+      ctx.fillStyle = obstacle.type === "high" ? "#7b2cbf" : "#bc4749";
+      ctx.fillRect(obstacle.x, obstacleTop, obstacle.w, obstacle.h);
+      ctx.fillStyle = obstacle.type === "high" ? "#c77dff" : "#f28482";
+      ctx.fillRect(obstacle.x + 6, obstacleTop + 8, obstacle.w - 12, 8);
+      ctx.fillStyle = "rgba(0,0,0,0.18)";
+      ctx.fillRect(obstacle.x + 4, obstacle.y + 2, obstacle.w - 8, 5);
+
+      if (obstacle.x > width - 150) {
+        const markerY = obstacle.type === "high" ? 102 : 138;
+        ctx.fillStyle = obstacle.type === "high" ? "#c77dff" : "#ff6b6b";
+        ctx.beginPath();
+        ctx.moveTo(width - 18, markerY);
+        ctx.lineTo(width - 42, markerY - 10);
+        ctx.lineTo(width - 42, markerY + 10);
+        ctx.closePath();
+        ctx.fill();
+      }
     }
 
     for (const pickup of state.runner.pickups) {
+      const pulse = 1 + Math.sin((state.elapsedMs / 120) + pickup.x * 0.02) * 0.08;
       ctx.fillStyle = "#ffe066";
       ctx.beginPath();
-      ctx.arc(pickup.x, pickup.y, pickup.r, 0, Math.PI * 2);
+      ctx.arc(pickup.x, pickup.y, pickup.r * pulse, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = "#fff3bf";
       ctx.beginPath();
       ctx.arc(pickup.x - 2, pickup.y - 2, pickup.r * 0.45, 0, Math.PI * 2);
       ctx.fill();
+      if ((pickup.value || 1) > 1) {
+        ctx.fillStyle = "#7a4d00";
+        ctx.font = "bold 12px Trebuchet MS";
+        ctx.fillText("2", pickup.x - 3, pickup.y + 4);
+      }
     }
 
     if (state.runner.portal) {
@@ -2283,14 +2330,16 @@ function drawRunnerUi() {
     return;
   }
 
-  ctx.fillStyle = "rgba(15, 23, 42, 0.55)";
-  ctx.fillRect(14, 14, 280, 72);
+  const remaining = Math.max(0, Math.floor((state.runner.portalDistance - state.runner.distance) / 10));
+  ctx.fillStyle = "rgba(15, 23, 42, 0.6)";
+  ctx.fillRect(14, 14, 336, 92);
   ctx.fillStyle = "#ffffff";
   ctx.font = "bold 18px Trebuchet MS";
-  ctx.fillText(`Mål: ${Math.max(0, Math.floor((state.runner.portalDistance - state.runner.distance) / 10))} m`, 24, 36);
+  ctx.fillText(`Portal om ${remaining} m`, 24, 36);
   ctx.font = "13px Trebuchet MS";
   ctx.fillText(`${state.runner.variantLabel}  |  Venstre: hopp  Høyre: dukk`, 24, 56);
-  ctx.fillText(`Banemynter: ${state.runner.collectedCoins}`, 24, 74);
+  ctx.fillText(`Banemynter: ${state.runner.collectedCoins}  |  Fullfør: +${state.runner.clearBonusCoins} bonus`, 24, 74);
+  ctx.fillText(`Krasj: -${Math.min(state.coins, state.runner.failCoinPenalty || runnerFailCoinPenalty)} run-mynter  |  Pilar varsler hinder`, 24, 92);
 }
 
 function drawFrame() {
