@@ -3,6 +3,7 @@ const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true }) || c
 const scoreEl = document.getElementById("score");
 const coinsEl = document.getElementById("coins");
 const levelEl = document.getElementById("level");
+const comboEl = document.getElementById("combo");
 const bestEl = document.getElementById("best");
 const overlayEl = document.getElementById("overlay");
 const messageEl = document.getElementById("message");
@@ -60,6 +61,9 @@ const discoDurationMs = 8000;
 const jetpackDurationMs = 900;
 const runnerDuckDurationMs = 520;
 const mapGoalHeight = 5000;
+const comboDecayMs = 2200;
+const comboStepSize = 3;
+const comboMaxMultiplier = 6;
 const supabaseConfig = window.SUPABASE_CONFIG || { url: "", publishableKey: "", table: "scores" };
 const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
 const lowFxMode = isCoarsePointer;
@@ -92,6 +96,34 @@ const skins = {
     description: "Frokost med fartstriper.",
     cost: 95,
     colors: { body: "#c08457", cape: "#ff9f1c", visor: "#fff0c2", accent: "#6b3e26" }
+  },
+  ghost: {
+    id: "ghost",
+    name: "Skyspøk",
+    description: "Et smilende laken med null respekt for fysikk.",
+    cost: 120,
+    colors: { body: "#eaf4ff", cape: "#9ad1ff", visor: "#fefefe", accent: "#6b7fa3" }
+  },
+  duck: {
+    id: "duck",
+    name: "Captain Quack",
+    description: "En and med altfor høy selvtillit.",
+    cost: 135,
+    colors: { body: "#ffd23f", cape: "#ff6b6b", visor: "#fff7cc", accent: "#7a4e00" }
+  },
+  disco: {
+    id: "disco",
+    name: "Disco Comet",
+    description: "Ren glitterpanikk i spillerform.",
+    cost: 150,
+    colors: { body: "#ff4fd8", cape: "#7c3aed", visor: "#a7f3d0", accent: "#3b0764" }
+  },
+  ninja: {
+    id: "ninja",
+    name: "Nattnudel",
+    description: "Mørk, dramatisk og litt for stolt.",
+    cost: 165,
+    colors: { body: "#1f2937", cape: "#ef4444", visor: "#fde68a", accent: "#030712" }
   }
 };
 
@@ -189,6 +221,36 @@ const skills = {
     description: "Kvassere styring og høyere toppfart en stund.",
     cost: 95
   },
+  magnet: {
+    id: "magnet",
+    name: "Myntmagnet",
+    description: "Mynter trekkes mot deg hele runden.",
+    cost: 90
+  },
+  moon_boots: {
+    id: "moon_boots",
+    name: "Månestøvler",
+    description: "Litt mykere tyngdekraft og mer svev.",
+    cost: 100
+  },
+  lucky_cat: {
+    id: "lucky_cat",
+    name: "Lucky Cat",
+    description: "Noen mynter blir plutselig litt bedre enn de burde være.",
+    cost: 110
+  },
+  party_hat: {
+    id: "party_hat",
+    name: "Festhatt",
+    description: "Av og til blir alt litt for mye. Helt topp.",
+    cost: 75
+  },
+  tiny_drama: {
+    id: "tiny_drama",
+    name: "Lite drama",
+    description: "Gir ingen mening, men kommenterer løpet ditt med stil.",
+    cost: 45
+  },
   banana: {
     id: "banana",
     name: "Mystisk banan",
@@ -269,6 +331,12 @@ const state = {
     bananaPulseUntil: 0
   },
   shopCategory: "skins",
+  combo: {
+    count: 0,
+    multiplier: 1,
+    expiresAt: 0,
+    flashUntil: 0
+  },
   runner: {
     triggered: false,
     completed: false,
@@ -277,6 +345,13 @@ const state = {
     portalDistance: 2600,
     stage: 1,
     nextTriggerScore: runnerIntervalScore,
+    variant: "classic",
+    variantLabel: "Klassisk",
+    pickups: [],
+    nextPickupAt: 0,
+    clearBonusCoins: 0,
+    collectedCoins: 0,
+    lowBias: 0.55,
     obstacles: [],
     portal: null,
     duckUntil: 0,
@@ -316,8 +391,35 @@ function hasSupabaseConfig() {
   return Boolean(supabaseConfig.url && supabaseConfig.publishableKey && supabaseConfig.table);
 }
 
+function repairMojibake(text) {
+  if (typeof text !== "string" || !/[ÃƒÃ‚Ã¢â‚¬]/.test(text)) {
+    return text;
+  }
+
+  try {
+    const bytes = Uint8Array.from([...text].map((char) => char.charCodeAt(0)));
+    const repaired = new TextDecoder("utf-8").decode(bytes);
+    return /\u0000/.test(repaired) ? text : repaired;
+  } catch {
+    return text;
+  }
+}
+
+function uiText(text) {
+  return repairMojibake(String(text ?? ""));
+}
+
+function escapeHtml(text) {
+  return uiText(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function setScoreStatus(message) {
-  scoreStatusEl.textContent = message;
+  scoreStatusEl.textContent = uiText(message);
 }
 
 function cloneDefaultProgression() {
@@ -332,6 +434,175 @@ function cloneDefaultProgression() {
     selectedSkill: defaultProgression.selectedSkill,
     unlockedBanana: defaultProgression.unlockedBanana
   };
+}
+
+function getMapRules() {
+  const mapId = state.progression?.selectedMap || "sky";
+  if (mapId === "sunset") {
+    return {
+      comboWindowBonus: 120,
+      comboBuildBonus: 1,
+      gravityShift: 0,
+      airControlBonus: 0.12,
+      idleDrag: 0.84,
+      platformGapBonus: 8,
+      boostPlatformBonus: 0.04,
+      phasePlatformBonus: 0.14,
+      icePlatformBonus: 0.02,
+      movingPlatformBonus: 0.03,
+      crackedPlatformBonus: 0.02,
+      collectibleBonus: 0.02,
+      runnerSpeedBonus: 0.95,
+      runnerPortalShift: -180,
+      runnerVariantWeights: { classic: 1, sprint: 3, tunnel: 1, coinrush: 2 }
+    };
+  }
+
+  if (mapId === "frost") {
+    return {
+      comboWindowBonus: 300,
+      comboBuildBonus: 0,
+      gravityShift: 0.018,
+      airControlBonus: -0.02,
+      idleDrag: 0.9,
+      platformGapBonus: 0,
+      boostPlatformBonus: 0.02,
+      phasePlatformBonus: 0.05,
+      icePlatformBonus: 0.22,
+      movingPlatformBonus: 0.12,
+      crackedPlatformBonus: 0.06,
+      collectibleBonus: 0,
+      runnerSpeedBonus: 0.2,
+      runnerPortalShift: 40,
+      runnerVariantWeights: { classic: 1, sprint: 1, tunnel: 3, coinrush: 1 }
+    };
+  }
+
+  return {
+    comboWindowBonus: 520,
+    comboBuildBonus: 0,
+    gravityShift: -0.018,
+    airControlBonus: 0.05,
+    idleDrag: 0.8,
+    platformGapBonus: -6,
+    boostPlatformBonus: 0.14,
+    phasePlatformBonus: 0.04,
+    icePlatformBonus: 0.04,
+    movingPlatformBonus: 0,
+    crackedPlatformBonus: 0,
+    collectibleBonus: 0.06,
+    runnerSpeedBonus: -0.2,
+    runnerPortalShift: -80,
+    runnerVariantWeights: { classic: 2, sprint: 1, tunnel: 1, coinrush: 3 }
+  };
+}
+
+function getComboWindowMs() {
+  return comboDecayMs + getMapRules().comboWindowBonus;
+}
+
+function resetCombo() {
+  state.combo.count = 0;
+  state.combo.multiplier = 1;
+  state.combo.expiresAt = 0;
+  state.combo.flashUntil = 0;
+}
+
+function extendCombo(amount, x, y, label = "") {
+  const rules = getMapRules();
+  const previousMultiplier = state.combo.multiplier;
+  state.combo.count = Math.max(0, state.combo.count + amount + rules.comboBuildBonus);
+  state.combo.multiplier = clamp(1 + Math.floor(state.combo.count / comboStepSize), 1, comboMaxMultiplier);
+  state.combo.expiresAt = state.elapsedMs + getComboWindowMs();
+  state.combo.flashUntil = state.elapsedMs + 460;
+
+  if (state.combo.multiplier > previousMultiplier) {
+    addFloatingText(`COMBO x${state.combo.multiplier}`, x, y, "#ff6b6b", 40);
+  } else if (label) {
+    addFloatingText(label, x, y, "#ffd166", 28);
+  }
+}
+
+function updateComboState() {
+  if (state.combo.count > 0 && state.elapsedMs > state.combo.expiresAt) {
+    resetCombo();
+    updateHud();
+  }
+}
+
+function grantCoins(amount, x, y, color = "#f9b208", text = "") {
+  if (!amount) {
+    return;
+  }
+
+  state.coins += amount;
+  state.progression.bankCoins += amount;
+  saveProgression();
+  updateProfileBar();
+  addFloatingText(text || `+${amount}`, x, y, color);
+
+  while (state.coins >= coinsPerLevel) {
+    levelUp();
+  }
+
+  updateHud();
+}
+
+function chooseWeightedOption(weights) {
+  const entries = Object.entries(weights);
+  const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
+  let roll = Math.random() * total;
+  for (const [key, weight] of entries) {
+    roll -= weight;
+    if (roll <= 0) {
+      return key;
+    }
+  }
+  return entries[0]?.[0] || "classic";
+}
+
+function getRunnerVariantConfig() {
+  const rules = getMapRules();
+  const variant = chooseWeightedOption(rules.runnerVariantWeights);
+  const configs = {
+    classic: { id: "classic", label: "Klassisk", speedBonus: 0, portalShift: 0, lowBias: 0.55, pickupBurst: false, reward: 0 },
+    sprint: { id: "sprint", label: "Sprint", speedBonus: 1.15, portalShift: -260, lowBias: 0.72, pickupBurst: false, reward: 2 },
+    tunnel: { id: "tunnel", label: "Dukkesone", speedBonus: 0.4, portalShift: -80, lowBias: 0.2, pickupBurst: false, reward: 3 },
+    coinrush: { id: "coinrush", label: "Myntjag", speedBonus: 0.3, portalShift: 40, lowBias: 0.55, pickupBurst: true, reward: 1 }
+  };
+  return configs[variant] || configs.classic;
+}
+
+function getPlatformType(guaranteedCenter, difficulty) {
+  if (guaranteedCenter) {
+    return "normal";
+  }
+
+  const rules = getMapRules();
+  const boostChance = clamp(0.08 + difficulty * 0.12 + rules.boostPlatformBonus, 0.04, 0.3);
+  const phaseChance = clamp(0.03 + difficulty * 0.1 + rules.phasePlatformBonus, 0.02, 0.24);
+  const iceChance = clamp(0.05 + difficulty * 0.08 + rules.icePlatformBonus, 0.03, 0.32);
+  const roll = Math.random();
+
+  if (roll < boostChance) {
+    return "boost";
+  }
+  if (roll < boostChance + phaseChance) {
+    return "phase";
+  }
+  if (roll < boostChance + phaseChance + iceChance) {
+    return "ice";
+  }
+  return "normal";
+}
+
+function isPlatformActive(platform) {
+  if (platform.type !== "phase") {
+    return true;
+  }
+  const cycleMs = 1260;
+  const visibleMs = 760;
+  return ((state.elapsedMs + platform.phaseOffset) % cycleMs) < visibleMs;
 }
 
 function uniqueList(items) {
@@ -422,8 +693,8 @@ function canAfford(cost) {
 
 function updateProfileBar() {
   coinBankEl.textContent = `${state.progression.bankCoins}`;
-  selectedMapNameEl.textContent = getSelectedMap().name;
-  selectedSkillNameEl.textContent = getSelectedSkill().name;
+  selectedMapNameEl.textContent = uiText(getSelectedMap().name);
+  selectedSkillNameEl.textContent = uiText(getSelectedSkill().name);
 }
 
 function applyBodyTheme() {
@@ -460,16 +731,16 @@ function renderShopCards(container, items, kind) {
       label = `${item.unlockScore} m`;
       extraClass = "locked";
     } else {
-      label = item.cost > 0 ? `${item.cost} coins` : "Gratis";
+      label = item.cost > 0 ? `${item.cost} mynter` : "Gratis";
     }
 
     return `
       <article class="shop-card">
         <div>
-          <strong>${item.name}</strong>
-          <p>${item.description}</p>
+          <strong>${escapeHtml(item.name)}</strong>
+          <p>${escapeHtml(item.description)}</p>
           <div class="shop-meta">
-            <span>${ownedItem ? "Eid" : lockedByScore ? "Låses opp senere" : `Pris: ${item.cost}`}</span>
+            <span>${escapeHtml(ownedItem ? "Eies" : lockedByScore ? "Låses opp senere" : `Pris: ${item.cost}`)}</span>
           </div>
         </div>
         <button
@@ -479,7 +750,7 @@ function renderShopCards(container, items, kind) {
           data-id="${item.id}"
           ${selected ? "disabled" : ""}
           ${lockedByScore ? "disabled" : ""}
-        >${label}</button>
+        >${escapeHtml(label)}</button>
       </article>`;
   }).join("");
 }
@@ -544,7 +815,7 @@ function purchase(kind, id) {
   }
 
   if (!canAfford(item.cost)) {
-    addFloatingText("Flere coins trengs", width / 2, state.cameraY + 220, "#ff6b6b", 60);
+    addFloatingText("Flere mynter trengs", width / 2, state.cameraY + 220, "#ff6b6b", 60);
     return;
   }
 
@@ -566,7 +837,7 @@ function unlockBananaIfNeeded(score) {
   saveProgression();
   renderShop();
   updateProfileBar();
-  addFloatingText("MYSTISK BANAN LASES OPP!", width / 2, state.cameraY + 180, "#ffe066", 90);
+  addFloatingText("MYSTISK BANAN LÅSES OPP!", width / 2, state.cameraY + 180, "#ffe066", 90);
   return true;
 }
 
@@ -579,7 +850,7 @@ function renderLeaderboard(scores) {
   }
 
   leaderboardEl.innerHTML = scores
-    .map((entry) => `<li><strong>${entry.name}</strong> - ${entry.score} m (level ${entry.level})</li>`)
+    .map((entry) => `<li><strong>${escapeHtml(entry.name)}</strong> - ${entry.score} m (level ${entry.level})</li>`)
     .join("");
 }
 
@@ -720,8 +991,8 @@ async function submitScore() {
 }
 
 function setOverlay(title, buttonText, show = true) {
-  messageEl.textContent = title;
-  actionEl.textContent = buttonText;
+  messageEl.textContent = uiText(title);
+  actionEl.textContent = uiText(buttonText);
   overlayEl.classList.toggle("hidden", !show);
   updateTouchButtonsVisibility();
 }
@@ -731,7 +1002,7 @@ function showStartOverlay() {
   leaderboardPanelEl.classList.add("hidden");
   saveScoreEl.disabled = false;
   renderShop();
-  setOverlay("Start rolig, samle coins og bygg opp banken din. Runner-brett kommer ved hver 1000m med hopp og dukk.", "Start spill", true);
+  setOverlay("Start rolig, samle mynter og bygg opp banken din. Runnerbrett kommer ved hver 1000 m med hopp og dukk.", "Start spill", true);
 }
 
 async function showGameOverOverlay() {
@@ -752,7 +1023,7 @@ async function showGameOverOverlay() {
     setScoreStatus("Ikke top 10 denne gangen, men her er lista.");
   }
 
-  setOverlay(`Du kom til level ${state.level} og nådde ${score} meter. Banken din er på ${state.progression.bankCoins} coins.`, "Prøv igjen", true);
+  setOverlay(`Du kom til level ${state.level} og nådde ${score} meter. Banken din er på ${state.progression.bankCoins} mynter.`, "Prøv igjen", true);
 }
 function ensureMusic() {
   if (music.context) {
@@ -818,19 +1089,39 @@ function isSpeedSkillActive() {
   return state.skillState.speedUntil > state.elapsedMs;
 }
 
+function isMagnetSkillActive() {
+  return state.progression.selectedSkill === "magnet";
+}
+
+function isMoonBootsActive() {
+  return state.progression.selectedSkill === "moon_boots";
+}
+
+function isLuckyCatActive() {
+  return state.progression.selectedSkill === "lucky_cat";
+}
+
+function isPartyHatActive() {
+  return state.progression.selectedSkill === "party_hat";
+}
+
+function isTinyDramaActive() {
+  return state.progression.selectedSkill === "tiny_drama";
+}
+
 function isBananaActive() {
   return state.effects.bananaUntil > state.elapsedMs;
 }
 
 function activateDisco(duration = discoDurationMs) {
   state.effects.discoUntil = Math.max(state.effects.discoUntil, state.elapsedMs + duration);
-  addFloatingText("DISCO!", width / 2, state.cameraY + 220, "#ff4fd8", 70);
+  addFloatingText("DISKO!", width / 2, state.cameraY + 220, "#ff4fd8", 70);
 }
 
 function activateJetpack(power = -17, duration = jetpackDurationMs) {
   state.effects.jetpackUntil = Math.max(state.effects.jetpackUntil, state.elapsedMs + duration);
   state.player.vy = Math.min(state.player.vy, power);
-  addFloatingText("JETPACK!", state.player.x + state.player.w / 2, state.player.y - 18, "#ff8c42", 60);
+  addFloatingText("RAKETTPAKKE!", state.player.x + state.player.w / 2, state.player.y - 18, "#ff8c42", 60);
 }
 
 function activateBananaSurprise() {
@@ -900,54 +1191,78 @@ function getRunDifficulty() {
 
 function getPlatformWidth() {
   const difficulty = getRunDifficulty();
+  const rules = getMapRules();
   const bananaBonus = isBananaActive() ? 16 : 0;
-  return Math.max(40, basePlatformWidth - state.level * 4 - difficulty * 26 + bananaBonus);
+  return Math.max(40, basePlatformWidth - state.level * 4 - difficulty * 26 + bananaBonus - rules.platformGapBonus * 0.28);
 }
 
 function getPlatformGap() {
   const difficulty = getRunDifficulty();
+  const rules = getMapRules();
   const bananaRelief = isBananaActive() ? 10 : 0;
-  return Math.min(154, basePlatformGap + state.level * 5 + difficulty * 24 - bananaRelief);
+  return Math.min(154, basePlatformGap + state.level * 5 + difficulty * 24 - bananaRelief + rules.platformGapBonus);
 }
 
 function getJumpVelocity() {
   const difficulty = getRunDifficulty();
+  const rules = getMapRules();
   let jump = baseJumpVelocity - Math.min(1.2, (state.level - 1) * 0.1) - difficulty * 0.65;
+  jump -= rules.gravityShift * 6.5;
   if (isBananaActive()) {
     jump -= 0.6;
+  }
+  if (isMoonBootsActive()) {
+    jump -= 0.8;
   }
   return jump;
 }
 
+
 function getGravity(vy) {
   const difficulty = getRunDifficulty();
+  const rules = getMapRules();
   const bananaShift = isBananaActive() ? -0.03 : 0;
+  const moonShift = isMoonBootsActive() ? -0.022 : 0;
+  const mapShift = rules.gravityShift;
 
-  if (vy < -7) return 0.22 + difficulty * 0.015 + bananaShift;
-  if (vy < -2) return 0.18 + difficulty * 0.02 + bananaShift;
-  if (vy < 1.2) return 0.12 + difficulty * 0.02 + bananaShift;
-  if (vy < 6) return 0.27 + difficulty * 0.025;
-  return 0.34 + difficulty * 0.03;
+  if (vy < -7) return 0.22 + difficulty * 0.015 + bananaShift + moonShift + mapShift;
+  if (vy < -2) return 0.18 + difficulty * 0.02 + bananaShift + moonShift + mapShift;
+  if (vy < 1.2) return 0.12 + difficulty * 0.02 + bananaShift + moonShift + mapShift * 0.8;
+  if (vy < 6) return 0.27 + difficulty * 0.025 + moonShift * 0.3 + mapShift * 0.45;
+  return 0.34 + difficulty * 0.03 + moonShift * 0.25 + mapShift * 0.2;
 }
 
 function addFloatingText(text, x, y, color, life = 50) {
-  state.floatingTexts.push({ text, x, y, color, life, maxLife: life });
+  state.floatingTexts.push({ text: uiText(text), x, y, color, life, maxLife: life });
 }
 
 function maybeCreateCollectible(platform) {
-  const baseChance = isBananaActive() ? 0.94 : 0.4;
+  const rules = getMapRules();
+  const baseChance = isBananaActive() ? 0.94 : 0.4 + rules.collectibleBonus;
   if (Math.random() > baseChance) {
     return;
   }
 
+  const coinValue = platform.type === "boost" ? 2 : 1;
   state.collectibles.push({
     type: "coin",
     x: platform.x + platform.w / 2,
     y: platform.y - rand(34, 58),
     r: 10,
-    value: 1,
+    value: coinValue,
     collected: false
   });
+
+  if (platform.type === "boost" && Math.random() < 0.45) {
+    state.collectibles.push({
+      type: "coin",
+      x: clamp(platform.x + platform.w / 2 + rand(-18, 18), 18, width - 18),
+      y: platform.y - rand(60, 88),
+      r: 10,
+      value: 1,
+      collected: false
+    });
+  }
 
   if (isBananaActive()) {
     const bananaBurst = 2 + Math.floor(Math.random() * 3);
@@ -964,7 +1279,7 @@ function maybeCreateCollectible(platform) {
   }
 
   const difficulty = getRunDifficulty();
-  const powerupChance = 0.06 + difficulty * 0.08 + (isBananaActive() ? 0.14 : 0);
+  const powerupChance = 0.06 + difficulty * 0.08 + rules.collectibleBonus + (isBananaActive() ? 0.14 : 0);
   if (Math.random() < powerupChance) {
     const type = Math.random() < 0.5 ? "disco" : "jetpack";
     state.collectibles.push({
@@ -980,10 +1295,12 @@ function maybeCreateCollectible(platform) {
 function createPlatform(y, guaranteedCenter = false, previousPlatform = null) {
   const platformWidth = getPlatformWidth();
   const difficulty = getRunDifficulty();
-  const movingChance = guaranteedCenter ? 0 : clamp((difficulty - 0.05) * 0.58, 0, 0.55);
-  const crackedChance = guaranteedCenter ? 0 : clamp((difficulty - 0.2) * 0.34, 0, 0.3);
+  const rules = getMapRules();
+  const movingChance = guaranteedCenter ? 0 : clamp((difficulty - 0.05) * 0.58 + rules.movingPlatformBonus, 0, 0.68);
+  const crackedChance = guaranteedCenter ? 0 : clamp((difficulty - 0.2) * 0.34 + rules.crackedPlatformBonus, 0, 0.38);
   const bananaPeelChance = (guaranteedCenter || !isBananaActive()) ? 0 : clamp(0.22 + difficulty * 0.08, 0.2, 0.46);
   const maxOffset = 80 + difficulty * 42;
+  const type = getPlatformType(guaranteedCenter, difficulty);
 
   let x;
   if (guaranteedCenter || !previousPlatform) {
@@ -996,50 +1313,77 @@ function createPlatform(y, guaranteedCenter = false, previousPlatform = null) {
   const platform = {
     x,
     y,
-    w: platformWidth,
+    w: type === "phase" ? Math.max(36, platformWidth - 8) : platformWidth,
     h: platformHeight,
     vx: Math.random() < movingChance ? rand(0.3, 0.65 + difficulty * 0.3) * (Math.random() < 0.5 ? -1 : 1) : 0,
-    cracked: Math.random() < crackedChance,
+    cracked: type === "boost" ? false : Math.random() < crackedChance,
     peel: Math.random() < bananaPeelChance,
     peelUsed: false,
-    broken: false
+    broken: false,
+    type,
+    phaseOffset: rand(0, 1000)
   };
 
   maybeCreateCollectible(platform);
   return platform;
 }
 
+function createRunnerPickup(x, y, value = 1) {
+  return { x, y, r: 8, value, collected: false };
+}
+
+function spawnRunnerPickupBurst() {
+  const lane = Math.random() < 0.5 ? "jump" : "ground";
+  const startX = width + rand(90, 150);
+  const count = state.runner.variant === "coinrush" ? 4 : 3;
+
+  for (let i = 0; i < count; i += 1) {
+    const offsetY = lane === "jump" ? runnerGroundY - 72 - (i % 2) * 12 : runnerGroundY - 24 - (i % 2) * 6;
+    state.runner.pickups.push(createRunnerPickup(startX + i * 38, offsetY, 1));
+  }
+}
 function createObstacle() {
-  const type = Math.random() < 0.55 ? "low" : "high";
+  const variant = state.runner.variant;
+  const lowBias = state.runner.lowBias || 0.55;
+  const type = Math.random() < lowBias ? "low" : "high";
   if (type === "low") {
     return {
       type,
       x: width + rand(40, 90),
       y: runnerGroundY,
-      w: rand(30, 46),
-      h: rand(34, 58)
+      w: variant === "sprint" ? rand(26, 40) : rand(30, 46),
+      h: variant === "sprint" ? rand(28, 46) : rand(34, 58)
     };
   }
 
   return {
     type,
     x: width + rand(40, 90),
-    y: runnerGroundY - rand(28, 34),
-    w: rand(40, 62),
-    h: rand(18, 24)
+    y: runnerGroundY - rand(variant === "tunnel" ? 34 : 28, variant === "tunnel" ? 44 : 34),
+    w: rand(40, variant === "tunnel" ? 84 : 62),
+    h: rand(18, variant === "tunnel" ? 28 : 24)
   };
 }
 
 function resetRunnerState() {
   const stage = Math.max(1, state.runner.stage || 1);
+  const rules = getMapRules();
+  const variantConfig = getRunnerVariantConfig();
   state.runner.distance = 0;
-  state.runner.nextObstacleAt = 700;
-  state.runner.portalDistance = 2600 + (stage - 1) * 260;
+  state.runner.nextObstacleAt = variantConfig.id === "sprint" ? 560 : 700;
+  state.runner.portalDistance = 2600 + (stage - 1) * 260 + rules.runnerPortalShift + variantConfig.portalShift;
+  state.runner.variant = variantConfig.id;
+  state.runner.variantLabel = variantConfig.label;
+  state.runner.pickups = [];
+  state.runner.nextPickupAt = variantConfig.pickupBurst ? 280 : 480;
+  state.runner.clearBonusCoins = variantConfig.reward;
+  state.runner.collectedCoins = 0;
+  state.runner.lowBias = variantConfig.lowBias;
   state.runner.obstacles = [];
   state.runner.portal = null;
   state.runner.duckUntil = 0;
   state.runner.obstacleCooldownUntil = 0;
-  state.runner.speed = 6.0 + state.level * 0.22 + stage * 0.42;
+  state.runner.speed = 6.0 + state.level * 0.22 + stage * 0.42 + rules.runnerSpeedBonus + variantConfig.speedBonus;
   state.runner.backgroundOffset = 0;
   state.runner.jumpQueued = false;
   state.runner.duckQueued = false;
@@ -1056,7 +1400,7 @@ function enterRunnerMode() {
   state.player.vx = 0;
   state.player.vy = 0;
   state.player.bounceSquash = 0;
-  addFloatingText(`RUNNER BRETT ${state.runner.stage}`, width / 2, state.cameraY + 220, "#00d1ff", 72);
+  addFloatingText(`RUNNERBRETT ${state.runner.stage} - ${state.runner.variantLabel}`, width / 2, state.cameraY + 220, "#00d1ff", 72);
 }
 
 function rebuildJumperWorld(baseY) {
@@ -1076,6 +1420,7 @@ function exitRunnerMode(success) {
   updateTouchButtonsVisibility();
   const runnerReward = runnerBonusScore + state.runner.stage * 90;
   const runnerPenalty = runnerCrashPenalty + (state.runner.stage - 1) * 30;
+  const variantCoinBonus = success ? state.runner.clearBonusCoins + state.runner.collectedCoins : 0;
   state.heightScore = Math.max(0, state.heightScore + (success ? runnerReward : -runnerPenalty));
   state.cameraY = -state.heightScore * 10;
 
@@ -1089,7 +1434,15 @@ function exitRunnerMode(success) {
   state.player.bounceSquash = 0.9;
 
   state.runner.completed = success;
-  addFloatingText(success ? "PORTAL BOOST!" : "TRUFFET!", width / 2, state.cameraY + 200, success ? "#00d1ff" : "#ff6b6b", 70);
+  if (success) {
+    extendCombo(2, width / 2, state.cameraY + 200, state.runner.variantLabel.toUpperCase());
+    if (variantCoinBonus > 0) {
+      grantCoins(variantCoinBonus, width / 2, state.cameraY + 170, "#ffe066", `+${variantCoinBonus} banemynter`);
+    }
+  } else {
+    resetCombo();
+  }
+  addFloatingText(success ? "PORTALBOOST!" : "TRUFFET!", width / 2, state.cameraY + 200, success ? "#00d1ff" : "#ff6b6b", 70);
   updateHud();
   maybeHandleMapClear();
 }
@@ -1116,7 +1469,9 @@ function resetSkillState() {
     frogJumpCount: 0,
     speedUntil: selected === "superspeed" ? 12000 : 0,
     bananaTriggered: false,
-    bananaPulseUntil: 0
+    bananaPulseUntil: 0,
+    partyBurstAt: selected === "party_hat" ? rand(700, 1500) : Infinity,
+    dramaNextAt: selected === "tiny_drama" ? rand(300, 700) : Infinity
   };
 }
 
@@ -1137,6 +1492,7 @@ function resetGame() {
   state.runner.triggered = false;
   state.runner.completed = false;
   state.runner.stage = 1;
+  resetCombo();
 
   state.runner.nextTriggerScore = runnerIntervalScore;
   resetRunnerState();
@@ -1160,14 +1516,21 @@ function updateHud() {
   scoreEl.textContent = `${Math.floor(state.heightScore)} m`;
   coinsEl.textContent = `${state.coins} / ${coinsPerLevel}`;
   levelEl.textContent = `${state.level}`;
+  if (comboEl) {
+    comboEl.textContent = `x${state.combo.multiplier}`;
+    comboEl.style.opacity = state.combo.count > 0 ? "1" : "0.55";
+  }
   bestEl.textContent = `${Math.floor(state.bestScore)} m`;
   updateProfileBar();
 }
 
 function levelUp() {
   state.level += 1;
-  state.coins = 0;
+  state.coins = Math.max(0, state.coins - coinsPerLevel);
   addFloatingText(`LEVEL ${state.level}!`, width / 2, state.cameraY + 220, "#ff5f6d", 60);
+  if (isPartyHatActive()) {
+    activateDisco(2200);
+  }
   updateHud();
 }
 
@@ -1186,7 +1549,7 @@ function spawnPlatforms() {
 }
 
 function updateMagnetizedPickups() {
-  if (!isBananaActive()) {
+  if (!isBananaActive() && !isMagnetSkillActive()) {
     return;
   }
 
@@ -1224,24 +1587,20 @@ function collectPickups() {
       item.collected = true;
 
       if (item.type === "coin") {
-        const bonus = isDiscoActive() ? 2 : isBananaActive() ? 3 : 1;
-        state.coins += bonus;
-        state.progression.bankCoins += bonus;
-        saveProgression();
-        updateProfileBar();
-        addFloatingText(`+${bonus}`, item.x, item.y, "#f9b208");
-        if (state.coins >= coinsPerLevel) {
-          levelUp();
-        } else {
-          updateHud();
-        }
+        const baseBonus = item.value || 1;
+        const luckyBonus = isLuckyCatActive() && Math.random() < 0.35 ? 2 : 0;
+        const bonus = baseBonus + (isDiscoActive() ? 1 : 0) + (isBananaActive() ? 1 : 0) + luckyBonus + Math.max(0, state.combo.multiplier - 1);
+        extendCombo(baseBonus + (luckyBonus > 0 ? 1 : 0), item.x, item.y, luckyBonus > 0 ? "LUCKY!" : `+${bonus}`);
+        grantCoins(bonus, item.x, item.y, "#f9b208", `+${bonus}`);
       }
 
       if (item.type === "disco") {
+        extendCombo(1, item.x, item.y, "DISKO!");
         activateDisco();
       }
 
       if (item.type === "jetpack") {
+        extendCombo(1, item.x, item.y, "RAKETTPAKKE!");
         activateJetpack(isBananaActive() ? -22 : -20, isBananaActive() ? 1600 : 1300);
       }
     }
@@ -1258,6 +1617,7 @@ function updateFloatingTexts() {
 
 function finishRun() {
   state.running = false;
+  resetCombo();
   showGameOverOverlay();
 }
 
@@ -1288,11 +1648,12 @@ function reviveFromFall() {
 function updateJumperPlayer() {
   const player = state.player;
   const difficulty = getRunDifficulty();
+  const rules = getMapRules();
   const moveIntent = getMoveIntent();
   const controlMult = getControlSpeedMultiplier();
   const speedSkillBonus = isSpeedSkillActive() ? 1 : 0;
-  const airAcceleration = (0.36 + difficulty * 0.08 + speedSkillBonus * 0.22 + (isBananaActive() ? 0.18 : 0)) * controlMult;
-  const maxMoveSpeed = (moveSpeed + difficulty * 0.62 + speedSkillBonus * 2.35 + (isBananaActive() ? 2.2 : 0)) * controlMult;
+  const airAcceleration = (0.36 + difficulty * 0.08 + speedSkillBonus * 0.22 + (isBananaActive() ? 0.18 : 0) + rules.airControlBonus) * controlMult;
+  const maxMoveSpeed = (moveSpeed + difficulty * 0.62 + speedSkillBonus * 2.35 + (isBananaActive() ? 2.2 : 0) + Math.max(0, rules.airControlBonus * 6)) * controlMult;
   const touchSpeedCap = state.touch.active && isCoarsePointer ? maxMoveSpeed * 1.24 : maxMoveSpeed;
 
   player.bounceSquash *= 0.84;
@@ -1300,7 +1661,7 @@ function updateJumperPlayer() {
   if (Math.abs(moveIntent) > 0.04) {
     player.vx += moveIntent * airAcceleration;
   } else {
-    player.vx *= 0.82;
+    player.vx *= rules.idleDrag;
   }
 
   if (isJetpackActive()) {
@@ -1309,6 +1670,18 @@ function updateJumperPlayer() {
 
   if (state.progression.selectedSkill === "banana" && !state.skillState.bananaTriggered && state.heightScore >= 900) {
     activateBananaSurprise();
+  }
+
+  if (isPartyHatActive() && state.heightScore >= state.skillState.partyBurstAt) {
+    state.skillState.partyBurstAt += rand(850, 1600);
+    activateDisco(2600);
+    addFloatingText("FESTMODUS!", width / 2, state.cameraY + 200, "#ff4fd8", 55);
+  }
+
+  if (isTinyDramaActive() && state.heightScore >= state.skillState.dramaNextAt) {
+    const dramaLines = ["DRAMATISK!", "FOR ET HOPP", "UHØRT FLYT", "LITEN HELT", "REN TEATER!"];
+    state.skillState.dramaNextAt += rand(380, 860);
+    addFloatingText(dramaLines[Math.floor(Math.random() * dramaLines.length)], width / 2, state.cameraY + 240, "#ffffff", 40);
   }
 
   player.vy += getGravity(player.vy);
@@ -1323,7 +1696,7 @@ function updateJumperPlayer() {
   }
 
   for (const platform of state.platforms) {
-    if (platform.broken) {
+    if (platform.broken || !isPlatformActive(platform)) {
       continue;
     }
 
@@ -1334,6 +1707,7 @@ function updateJumperPlayer() {
     if (player.vy > 0 && wasAbove && touchingX && touchingY) {
       player.y = platform.y - player.h;
       player.vy = getJumpVelocity();
+      extendCombo(platform.type === "boost" ? 2 : 1, platform.x + platform.w / 2, platform.y - 12, platform.type === "boost" ? "BOOST!" : "");
       if (isFrogActive()) {
         state.skillState.frogJumpCount = (state.skillState.frogJumpCount || 0) + 1;
         if (state.skillState.frogJumpCount % 3 === 0) {
@@ -1342,6 +1716,15 @@ function updateJumperPlayer() {
         }
       }
       player.bounceSquash = 1;
+
+      if (platform.type === "boost") {
+        player.vy -= 2.7;
+      }
+
+      if (platform.type === "ice") {
+        player.vx = clamp(player.vx * 1.14 + platform.vx * 0.9, -touchSpeedCap * 1.15, touchSpeedCap * 1.15);
+        addFloatingText("ISGLID!", platform.x + platform.w / 2, platform.y - 10, "#9ad1ff", 34);
+      }
 
       if (platform.vx) {
         player.x += platform.vx * 0.6;
@@ -1354,10 +1737,14 @@ function updateJumperPlayer() {
         addFloatingText("SKLIII!", platform.x + platform.w / 2, platform.y - 10, "#ffe066", 44);
       }
 
-      if (platform.cracked) {
+      if (platform.type === "phase") {
+        platform.broken = true;
+        addFloatingText("POFF!", platform.x + platform.w / 2, platform.y - 8, "#c77dff", 30);
+      } else if (platform.cracked) {
         platform.broken = true;
         addFloatingText("KNAKK!", platform.x + platform.w / 2, platform.y - 8, "#ff6b6b", 34);
       }
+      updateHud();
       break;
     }
   }
@@ -1435,14 +1822,24 @@ function updateRunnerPlayer() {
 
   if (!runner.portal && runner.distance >= runner.nextObstacleAt) {
     runner.obstacles.push(createObstacle());
-    const baseSpacing = 360 - Math.min(120, runner.stage * 18);
-    runner.nextObstacleAt += rand(Math.max(210, baseSpacing), Math.max(300, baseSpacing + 120));
+    const baseSpacing = runner.variant === "sprint" ? 300 : 360 - Math.min(120, runner.stage * 18);
+    runner.nextObstacleAt += rand(Math.max(180, baseSpacing), Math.max(280, baseSpacing + 110));
+  }
+
+  if (runner.variant === "coinrush" && runner.distance >= runner.nextPickupAt) {
+    spawnRunnerPickupBurst();
+    runner.nextPickupAt += rand(160, 250);
   }
 
   for (const obstacle of runner.obstacles) {
     obstacle.x -= speed;
   }
   runner.obstacles = runner.obstacles.filter((obstacle) => obstacle.x + obstacle.w > -60);
+
+  for (const pickup of runner.pickups) {
+    pickup.x -= speed;
+  }
+  runner.pickups = runner.pickups.filter((pickup) => !pickup.collected && pickup.x + pickup.r > -20);
 
   if (runner.portal) {
     runner.portal.x -= speed;
@@ -1455,6 +1852,23 @@ function updateRunnerPlayer() {
     w: player.w - 12,
     h: boxHeight
   };
+
+  for (const pickup of runner.pickups) {
+    if (pickup.collected) {
+      continue;
+    }
+    const hit = playerBox.x < pickup.x + pickup.r &&
+      playerBox.x + playerBox.w > pickup.x - pickup.r &&
+      playerBox.y < pickup.y + pickup.r &&
+      playerBox.y + playerBox.h > pickup.y - pickup.r;
+    if (!hit) {
+      continue;
+    }
+    pickup.collected = true;
+    state.runner.collectedCoins += pickup.value;
+    extendCombo(1, pickup.x, pickup.y, "RUSH!");
+    grantCoins(pickup.value, pickup.x, state.cameraY + 180, "#ffe066", `+${pickup.value}`);
+  }
 
   if (runner.portal) {
     const portalHit = playerBox.x < runner.portal.x + runner.portal.w &&
@@ -1491,6 +1905,7 @@ function updateRunnerPlayer() {
 function stepSimulation() {
   state.elapsedMs += fixedStepMs;
   updateFloatingTexts();
+  updateComboState();
 
   if (!state.running) {
     return;
@@ -1580,9 +1995,12 @@ function drawPlatforms() {
 
   for (const platform of state.platforms) {
     const screenY = platform.y - state.cameraY;
-    ctx.fillStyle = platform.cracked ? "#8d6f64" : platform.vx ? movingColor : staticColor;
+    const active = isPlatformActive(platform);
+    ctx.save();
+    ctx.globalAlpha = platform.type === "phase" && !active ? 0.25 : 1;
+    ctx.fillStyle = platform.type === "boost" ? "#ff8c42" : platform.type === "ice" ? "#7dd3fc" : platform.cracked ? "#8d6f64" : platform.vx ? movingColor : staticColor;
     ctx.fillRect(platform.x, screenY, platform.w, platform.h);
-    ctx.fillStyle = platform.cracked ? "#d8c0b1" : glowColor;
+    ctx.fillStyle = platform.type === "boost" ? "#ffe29a" : platform.type === "ice" ? "#effbff" : platform.cracked ? "#d8c0b1" : glowColor;
     ctx.fillRect(platform.x + 4, screenY + 3, platform.w - 8, 4);
 
     if (platform.cracked) {
@@ -1594,6 +2012,26 @@ function drawPlatforms() {
       ctx.lineTo(platform.x + platform.w - 12, screenY + 3);
       ctx.stroke();
     }
+
+    if (platform.type === "boost") {
+      ctx.strokeStyle = "#fff3bf";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(platform.x + 12, screenY + platform.h - 2);
+      ctx.lineTo(platform.x + platform.w / 2, screenY + 2);
+      ctx.lineTo(platform.x + platform.w - 12, screenY + platform.h - 2);
+      ctx.stroke();
+    }
+
+    if (platform.type === "ice") {
+      ctx.strokeStyle = "rgba(255,255,255,0.8)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(platform.x + 10, screenY + 5);
+      ctx.lineTo(platform.x + platform.w - 10, screenY + 5);
+      ctx.stroke();
+    }
+
     if (platform.peel && !platform.peelUsed) {
       const peelX = platform.x + platform.w * 0.5;
       const peelY = screenY - 4;
@@ -1607,7 +2045,7 @@ function drawPlatforms() {
       ctx.arc(peelX, peelY, 9, 0.4, 2.7);
       ctx.stroke();
     }
-
+    ctx.restore();
   }
 }
 
@@ -1618,6 +2056,17 @@ function drawCollectibles() {
       ctx.fillRect(obstacle.x, obstacle.y - obstacle.h, obstacle.w, obstacle.h);
       ctx.fillStyle = "#f28482";
       ctx.fillRect(obstacle.x + 6, obstacle.y - obstacle.h + 8, obstacle.w - 12, 8);
+    }
+
+    for (const pickup of state.runner.pickups) {
+      ctx.fillStyle = "#ffe066";
+      ctx.beginPath();
+      ctx.arc(pickup.x, pickup.y, pickup.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#fff3bf";
+      ctx.beginPath();
+      ctx.arc(pickup.x - 2, pickup.y - 2, pickup.r * 0.45, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     if (state.runner.portal) {
@@ -1654,6 +2103,11 @@ function drawCollectibles() {
       ctx.beginPath();
       ctx.arc(item.x - 2, screenY - 2, item.r * 0.45, 0, Math.PI * 2);
       ctx.fill();
+      if ((item.value || 1) > 1) {
+        ctx.fillStyle = "#7a4d00";
+        ctx.font = "bold 12px Trebuchet MS";
+        ctx.fillText("2", item.x - 3, screenY + 4);
+      }
       continue;
     }
 
@@ -1740,7 +2194,7 @@ function drawPlayer() {
   ctx.roundRect(bodyX, bodyY + 8, bodyW, bodyH - 8, 16);
   ctx.fill();
 
-  ctx.fillStyle = skin.id === "melon" ? "#2f6f36" : skin.id === "robot" ? "#d7dee9" : skin.id === "toast" ? "#f4d4a5" : "#ffd7a8";
+  ctx.fillStyle = skin.id === "melon" ? "#2f6f36" : skin.id === "robot" ? "#d7dee9" : skin.id === "toast" ? "#f4d4a5" : skin.id === "ghost" ? "#f8fbff" : skin.id === "duck" ? "#ffe08a" : skin.id === "disco" ? "#ffd0f4" : skin.id === "ninja" ? "#d1d5db" : "#ffd7a8";
   ctx.beginPath();
   ctx.arc(screenX + player.w / 2, bodyY + 14, 12, 0, Math.PI * 2);
   ctx.fill();
@@ -1789,6 +2243,32 @@ function drawPlayer() {
   ctx.strokeStyle = skin.colors.accent;
   ctx.lineWidth = 3;
   ctx.beginPath();
+  if (skin.id === "ghost") {
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.beginPath();
+    ctx.arc(screenX + player.w / 2, bodyY + 28, 16, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (skin.id === "duck") {
+    ctx.fillStyle = "#ff9f1c";
+    ctx.beginPath();
+    ctx.moveTo(screenX + player.w / 2, bodyY + 16);
+    ctx.lineTo(screenX + player.w / 2 + 12, bodyY + 20);
+    ctx.lineTo(screenX + player.w / 2, bodyY + 24);
+    ctx.closePath();
+    ctx.fill();
+  }
+  if (skin.id === "disco") {
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    for (let i = 0; i < 3; i += 1) {
+      ctx.fillRect(screenX + 8 + i * 10, bodyY + 26 + (i % 2) * 3, 5, 5);
+    }
+  }
+  if (skin.id === "ninja") {
+    ctx.fillStyle = "#111827";
+    ctx.fillRect(screenX + 8, bodyY + 20, player.w - 16, 10);
+  }
+
   ctx.moveTo(screenX + 12, bodyY + bodyH - 2);
   ctx.lineTo(screenX + 10, bodyY + bodyH + 9);
   ctx.moveTo(screenX + player.w - 12, bodyY + bodyH - 2);
@@ -1802,12 +2282,13 @@ function drawRunnerUi() {
   }
 
   ctx.fillStyle = "rgba(15, 23, 42, 0.55)";
-  ctx.fillRect(14, 14, 240, 54);
+  ctx.fillRect(14, 14, 280, 72);
   ctx.fillStyle = "#ffffff";
   ctx.font = "bold 18px Trebuchet MS";
-  ctx.fillText(`Mål: ${Math.max(0, Math.floor((state.runner.portalDistance - state.runner.distance) / 10))} m`, 24, 38);
+  ctx.fillText(`Mål: ${Math.max(0, Math.floor((state.runner.portalDistance - state.runner.distance) / 10))} m`, 24, 36);
   ctx.font = "13px Trebuchet MS";
-  ctx.fillText("Venstre: hopp  Høyre: dukk", 24, 58);
+  ctx.fillText(`${state.runner.variantLabel}  |  Venstre: hopp  Høyre: dukk`, 24, 56);
+  ctx.fillText(`Banemynter: ${state.runner.collectedCoins}`, 24, 74);
 }
 
 function drawFrame() {
@@ -1863,7 +2344,20 @@ function startGame() {
   if (state.progression.selectedSkill === "superspeed") {
     addFloatingText("SUPERSPEED!", width / 2, state.cameraY + 220, "#7dd3fc", 65);
   }
+  if (state.progression.selectedSkill === "magnet") {
+    addFloatingText("MAGNETMODUS!", width / 2, state.cameraY + 220, "#ffe066", 65);
+  }
+  if (state.progression.selectedSkill === "moon_boots") {
+    addFloatingText("MÅNESTØVLER!", width / 2, state.cameraY + 220, "#dbeafe", 65);
+  }
+  if (state.progression.selectedSkill === "party_hat") {
+    addFloatingText("FESTHATT!", width / 2, state.cameraY + 220, "#ff4fd8", 65);
+  }
+  if (state.progression.selectedSkill === "tiny_drama") {
+    addFloatingText("FULLT DRAMA!", width / 2, state.cameraY + 220, "#ffffff", 65);
+  }
 }
+
 
 function getCanvasPoint(event) {
   const rect = canvas.getBoundingClientRect();
@@ -2245,93 +2739,5 @@ updateControlModeUi();
 updateTouchButtonsVisibility();
 fetchLeaderboard();
 requestAnimationFrame(loop);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

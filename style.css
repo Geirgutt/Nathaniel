@@ -1,4 +1,4 @@
-﻿* {
+* {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
 }
@@ -83,6 +83,10 @@ body {
 
 .mini-value {
   font-size: 1rem;
+}
+
+.combo-value {
+  color: #ff6b6b;
 }
 
 #game {
