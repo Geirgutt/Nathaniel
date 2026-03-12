@@ -1134,10 +1134,10 @@ function activateJetpack(power = -17, duration = jetpackDurationMs) {
   state.player.vy = Math.min(state.player.vy, power);
   addFloatingText("RAKETTPAKKE!", state.player.x + state.player.w / 2, state.player.y - 18, "#ff8c42", 60);
 }
-function activateRush(duration = rushDurationMs) {
+function activateRush(power = -28, duration = rushDurationMs) {
   state.effects.rushUntil = Math.max(state.effects.rushUntil, state.elapsedMs + duration);
-  state.player.vx = clamp(state.player.vx * 1.18, -7.8, 7.8);
-  addFloatingText("TURBOBOOST!", state.player.x + state.player.w / 2, state.player.y - 18, "#7dd3fc", 60);
+  state.player.vy = Math.min(state.player.vy, power);
+  addFloatingText("SUPERJETPACK!", state.player.x + state.player.w / 2, state.player.y - 18, "#7dd3fc", 60);
 }
 function activateBananaSurprise() {
   state.skillState.bananaTriggered = true;
@@ -1626,8 +1626,8 @@ function collectPickups() {
         const baseBonus = item.value || 1;
         const luckyBonus = isLuckyCatActive() && Math.random() < 0.35 ? 2 : 0;
         const bonus = baseBonus + (isDiscoActive() ? 1 : 0) + (isBananaActive() ? 1 : 0) + luckyBonus + Math.max(0, state.combo.multiplier - 1);
-        extendCombo(baseBonus + (luckyBonus > 0 ? 1 : 0), item.x, item.y, luckyBonus > 0 ? "LUCKY!" : `+${bonus}`);
-        grantCoins(bonus, item.x, item.y, "#f9b208", `+${bonus}`);
+        extendCombo(baseBonus + (luckyBonus > 0 ? 1 : 0), item.x, item.y, luckyBonus > 0 ? "LUCKY!" : "+" + bonus);
+        grantCoins(bonus, item.x, item.y, "#f9b208", "+" + bonus);
       }
 
       if (item.type === "disco") {
@@ -1639,9 +1639,10 @@ function collectPickups() {
         extendCombo(1, item.x, item.y, "RAKETTPAKKE!");
         activateJetpack(isBananaActive() ? -22 : -20, isBananaActive() ? 1600 : 1300);
       }
+
       if (item.type === "rush") {
-        extendCombo(1, item.x, item.y, "TURBO!");
-        activateRush(isBananaActive() ? 3000 : rushDurationMs);
+        extendCombo(1, item.x, item.y, "SUPERJETPACK!");
+        activateRush(isBananaActive() ? -31 : -28, isBananaActive() ? 2200 : rushDurationMs);
       }
     }
   }
@@ -1692,9 +1693,8 @@ function updateJumperPlayer() {
   const moveIntent = getMoveIntent();
   const controlMult = getControlSpeedMultiplier();
   const speedSkillBonus = isSpeedSkillActive() ? 1 : 0;
-  const rushBonus = isRushActive() ? 1 : 0;
-  const airAcceleration = (0.36 + difficulty * 0.08 + speedSkillBonus * 0.22 + rushBonus * 0.28 + (isBananaActive() ? 0.18 : 0) + rules.airControlBonus) * controlMult;
-  const maxMoveSpeed = (moveSpeed + difficulty * 0.62 + speedSkillBonus * 2.35 + rushBonus * 2.6 + (isBananaActive() ? 2.2 : 0) + Math.max(0, rules.airControlBonus * 6)) * controlMult;
+  const airAcceleration = (0.36 + difficulty * 0.08 + speedSkillBonus * 0.22 + (isBananaActive() ? 0.18 : 0) + rules.airControlBonus) * controlMult;
+  const maxMoveSpeed = (moveSpeed + difficulty * 0.62 + speedSkillBonus * 2.35 + (isBananaActive() ? 2.2 : 0) + Math.max(0, rules.airControlBonus * 6)) * controlMult;
   const touchSpeedCap = state.touch.active && isCoarsePointer ? maxMoveSpeed * 1.24 : maxMoveSpeed;
 
   player.bounceSquash *= 0.84;
@@ -1702,13 +1702,13 @@ function updateJumperPlayer() {
   if (Math.abs(moveIntent) > 0.04) {
     player.vx += moveIntent * airAcceleration;
   } else {
-    player.vx *= isRushActive() ? Math.max(0.9, rules.idleDrag + 0.14) : rules.idleDrag;
+    player.vx *= rules.idleDrag;
   }
-  if (isJetpackActive()) {
-    player.vy = Math.min(player.vy, -11.5);
-  }
+
   if (isRushActive()) {
-    player.vx *= 1.012;
+    player.vy = Math.min(player.vy, -16.6);
+  } else if (isJetpackActive()) {
+    player.vy = Math.min(player.vy, -11.5);
   }
 
   if (state.progression.selectedSkill === "banana" && !state.skillState.bananaTriggered && state.heightScore >= 900) {
@@ -2216,30 +2216,25 @@ function drawCollectibles() {
       continue;
     }
     if (item.type === "rush") {
-      ctx.save();
-      ctx.translate(item.x, screenY);
-      ctx.fillStyle = "#0f172a";
-      ctx.beginPath();
-      ctx.moveTo(-12, 4);
-      ctx.lineTo(0, -14);
-      ctx.lineTo(12, 4);
-      ctx.lineTo(0, 14);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = "#7dd3fc";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(-6, 5);
-      ctx.lineTo(0, -6);
-      ctx.lineTo(6, 5);
-      ctx.stroke();
+      ctx.fillStyle = "#7dd3fc";
+      ctx.fillRect(item.x - 13, screenY - 15, 26, 30);
+      ctx.fillStyle = "#1e3a5f";
+      ctx.fillRect(item.x - 8, screenY - 10, 5, 20);
+      ctx.fillRect(item.x + 3, screenY - 10, 5, 20);
+      ctx.fillStyle = "#dbeafe";
+      ctx.fillRect(item.x - 4, screenY - 18, 8, 8);
       ctx.fillStyle = "#38bdf8";
       ctx.beginPath();
-      ctx.moveTo(-8, 8);
-      ctx.lineTo(0, 18 + Math.sin(state.elapsedMs / 50) * 4);
-      ctx.lineTo(8, 8);
+      ctx.moveTo(item.x - 8, screenY + 14);
+      ctx.lineTo(item.x - 2, screenY + 30 + Math.sin(state.elapsedMs / 45) * 4);
+      ctx.lineTo(item.x + 1, screenY + 16);
       ctx.fill();
-      ctx.restore();
+      ctx.beginPath();
+      ctx.moveTo(item.x + 8, screenY + 14);
+      ctx.lineTo(item.x + 2, screenY + 30 + Math.sin(state.elapsedMs / 45 + 1) * 4);
+      ctx.lineTo(item.x - 1, screenY + 16);
+      ctx.fill();
+      continue;
     }
   }
 }
@@ -2274,17 +2269,19 @@ function drawPlayer() {
   const bodyY = screenY + (player.h - bodyH) + (ducking ? 8 : 0);
   const disco = isDiscoActive();
 
-  if (isJetpackActive() && state.mode !== "runner") {
-    ctx.fillStyle = "rgba(255,140,66,0.55)";
+  if ((isJetpackActive() || isRushActive()) && state.mode !== "runner") {
+    const flameScale = isRushActive() ? 1.55 : 1;
+    const flameColor = isRushActive() ? "rgba(56,189,248,0.68)" : "rgba(255,140,66,0.55)";
+    ctx.fillStyle = flameColor;
     ctx.beginPath();
     ctx.moveTo(screenX + player.w * 0.28, screenY + player.h);
-    ctx.lineTo(screenX + player.w * 0.18, screenY + player.h + 20 + Math.sin(state.elapsedMs / 40) * 4);
-    ctx.lineTo(screenX + player.w * 0.38, screenY + player.h + 12);
+    ctx.lineTo(screenX + player.w * 0.18, screenY + player.h + (20 * flameScale) + Math.sin(state.elapsedMs / 40) * 4);
+    ctx.lineTo(screenX + player.w * 0.38, screenY + player.h + (12 * flameScale));
     ctx.fill();
     ctx.beginPath();
     ctx.moveTo(screenX + player.w * 0.72, screenY + player.h);
-    ctx.lineTo(screenX + player.w * 0.62, screenY + player.h + 20 + Math.sin(state.elapsedMs / 40 + 1) * 4);
-    ctx.lineTo(screenX + player.w * 0.82, screenY + player.h + 12);
+    ctx.lineTo(screenX + player.w * 0.62, screenY + player.h + (20 * flameScale) + Math.sin(state.elapsedMs / 40 + 1) * 4);
+    ctx.lineTo(screenX + player.w * 0.82, screenY + player.h + (12 * flameScale));
     ctx.fill();
   }
 
@@ -2403,7 +2400,7 @@ function drawStatusEffects() {
   }
   const labels = [];
   if (isRushActive()) {
-    labels.push({ text: "TURBO", color: "#7dd3fc" });
+    labels.push({ text: "SUPERJETPACK", color: "#7dd3fc" });
   }
   if (isJetpackActive()) {
     labels.push({ text: "JETPACK", color: "#ffb366" });
