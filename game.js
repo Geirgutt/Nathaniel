@@ -1,4 +1,4 @@
-ï»¿const canvas = document.getElementById("game");
+const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true }) || canvas.getContext("2d");
 const scoreEl = document.getElementById("score");
 const coinsEl = document.getElementById("coins");
@@ -63,11 +63,15 @@ const coinsPerLevel = 12;
 const leaderboardLimit = 10;
 const discoDurationMs = 8000;
 const jetpackDurationMs = 900;
+const rushDurationMs = 2200;
 const runnerDuckDurationMs = 520;
 const mapGoalHeight = 5000;
 const comboDecayMs = 2200;
 const comboStepSize = 3;
 const comboMaxMultiplier = 6;
+const phaseCycleMs = 1380;
+const phaseVisibleMs = 880;
+const phaseSpawnGraceMs = 720;
 const supabaseConfig = window.SUPABASE_CONFIG || { url: "", publishableKey: "", table: "scores" };
 const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
 const lowFxMode = isCoarsePointer;
@@ -76,7 +80,7 @@ const skins = {
   starter: {
     id: "starter",
     name: "Sky Kid",
-    description: "Klassisk helt med rÃ¸d kappe.",
+    description: "Klassisk helt med rød kappe.",
     cost: 0,
     colors: { body: "#1f3c88", cape: "#ff5f6d", visor: "#7dd3fc", accent: "#0f172a" }
   },
@@ -103,7 +107,7 @@ const skins = {
   },
   ghost: {
     id: "ghost",
-    name: "SkyspÃ¸k",
+    name: "Skyspøk",
     description: "Et smilende laken med null respekt for fysikk.",
     cost: 120,
     colors: { body: "#eaf4ff", cape: "#9ad1ff", visor: "#fefefe", accent: "#6b7fa3" }
@@ -111,7 +115,7 @@ const skins = {
   duck: {
     id: "duck",
     name: "Captain Quack",
-    description: "En and med altfor hÃ¸y selvtillit.",
+    description: "En and med altfor høy selvtillit.",
     cost: 135,
     colors: { body: "#ffd23f", cape: "#ff6b6b", visor: "#fff7cc", accent: "#7a4e00" }
   },
@@ -125,7 +129,7 @@ const skins = {
   ninja: {
     id: "ninja",
     name: "Nattnudel",
-    description: "MÃ¸rk, dramatisk og litt for stolt.",
+    description: "Mørk, dramatisk og litt for stolt.",
     cost: 165,
     colors: { body: "#1f2937", cape: "#ef4444", visor: "#fde68a", accent: "#030712" }
   }
@@ -222,7 +226,7 @@ const skills = {
   superspeed: {
     id: "superspeed",
     name: "Superspeed",
-    description: "Kvassere styring og hÃ¸yere toppfart en stund.",
+    description: "Kvassere styring og høyere toppfart en stund.",
     cost: 95
   },
   magnet: {
@@ -233,14 +237,14 @@ const skills = {
   },
   moon_boots: {
     id: "moon_boots",
-    name: "MÃ¥nestÃ¸vler",
+    name: "Månestøvler",
     description: "Litt mykere tyngdekraft og mer svev.",
     cost: 100
   },
   lucky_cat: {
     id: "lucky_cat",
     name: "Lucky Cat",
-    description: "Noen mynter blir plutselig litt bedre enn de burde vÃ¦re.",
+    description: "Noen mynter blir plutselig litt bedre enn de burde være.",
     cost: 110
   },
   party_hat: {
@@ -252,13 +256,13 @@ const skills = {
   tiny_drama: {
     id: "tiny_drama",
     name: "Lite drama",
-    description: "Gir ingen mening, men kommenterer lÃ¸pet ditt med stil.",
+    description: "Gir ingen mening, men kommenterer løpet ditt med stil.",
     cost: 45
   },
   banana: {
     id: "banana",
     name: "Mystisk banan",
-    description: "Ingen vet hva den egentlig gjÃ¸r. LÃ¥ses opp ved 5000 m.",
+    description: "Ingen vet hva den egentlig gjør. Låses opp ved 5000 m.",
     cost: 0,
     unlockScore: 5000
   }
@@ -324,7 +328,8 @@ const state = {
   effects: {
     discoUntil: 0,
     jetpackUntil: 0,
-    bananaUntil: 0
+    bananaUntil: 0,
+    rushUntil: 0
   },
   skillState: {
     selected: "none",
@@ -396,7 +401,7 @@ function hasSupabaseConfig() {
 }
 
 function repairMojibake(text) {
-  if (typeof text !== "string" || !/[ÃƒÆ’Ãƒâ€šÃƒÂ¢Ã¢â€šÂ¬]/.test(text)) {
+  if (typeof text !== "string" || !/[ÃƒÃ‚Ã¢â‚¬]/.test(text)) {
     return text;
   }
 
@@ -603,9 +608,10 @@ function isPlatformActive(platform) {
   if (platform.type !== "phase") {
     return true;
   }
-  const cycleMs = 1260;
-  const visibleMs = 760;
-  return ((state.elapsedMs + platform.phaseOffset) % cycleMs) < visibleMs;
+  if (platform.safeUntil && state.elapsedMs < platform.safeUntil) {
+    return true;
+  }
+  return ((state.elapsedMs + platform.phaseOffset) % phaseCycleMs) < phaseVisibleMs;
 }
 
 function uniqueList(items) {
@@ -722,7 +728,7 @@ function renderShopCards(container, items, kind) {
       (kind === "skill" && state.progression.selectedSkill === item.id);
     const lockedByScore = Boolean(item.unlockScore && state.bestScore < item.unlockScore && !ownedItem);
 
-    let label = "KjÃ¸p";
+    let label = "Kjøp";
     let extraClass = "";
     if (selected) {
       label = "Valgt";
@@ -743,7 +749,7 @@ function renderShopCards(container, items, kind) {
           <strong>${escapeHtml(item.name)}</strong>
           <p>${escapeHtml(item.description)}</p>
           <div class="shop-meta">
-            <span>${escapeHtml(ownedItem ? "Eies" : lockedByScore ? "LÃ¥ses opp senere" : `Pris: ${item.cost}`)}</span>
+            <span>${escapeHtml(ownedItem ? "Eies" : lockedByScore ? "Låses opp senere" : `Pris: ${item.cost}`)}</span>
           </div>
         </div>
         <button
@@ -840,7 +846,7 @@ function unlockBananaIfNeeded(score) {
   saveProgression();
   renderShop();
   updateProfileBar();
-  addFloatingText("MYSTISK BANAN LÃ…SES OPP!", width / 2, state.cameraY + 180, "#ffe066", 90);
+  addFloatingText("MYSTISK BANAN LÅSES OPP!", width / 2, state.cameraY + 180, "#ffe066", 90);
   return true;
 }
 
@@ -891,7 +897,7 @@ async function fetchLeaderboard() {
   if (!hasSupabaseConfig()) {
     const scores = readLocalLeaderboard();
     renderLeaderboard(scores);
-    setScoreStatus("Fyll inn Supabase i config.js for delt toppliste. Viser lokal liste forelÃ¸pig.");
+    setScoreStatus("Fyll inn Supabase i config.js for delt toppliste. Viser lokal liste foreløpig.");
     return scores;
   }
 
@@ -935,7 +941,7 @@ async function submitScore() {
 
   const name = getPlayerName();
   if (!name) {
-    setScoreStatus("Skriv inn kallenavn for Ã¥ lagre score.");
+    setScoreStatus("Skriv inn kallenavn for å lagre score.");
     playerNameEl.focus();
     return;
   }
@@ -1026,7 +1032,7 @@ async function showGameOverOverlay() {
     setScoreStatus("Ikke top 10 denne gangen, men her er lista.");
   }
 
-  setOverlay(`Du kom til level ${state.level} og nÃ¥dde ${score} meter. Banken din er pÃ¥ ${state.progression.bankCoins} mynter.`, "PrÃ¸v igjen", true);
+  setOverlay(`Du kom til level ${state.level} og nådde ${score} meter. Banken din er på ${state.progression.bankCoins} mynter.`, "Prøv igjen", true);
 }
 function ensureMusic() {
   if (music.context) {
@@ -1079,7 +1085,9 @@ function isDiscoActive() {
 function isJetpackActive() {
   return state.effects.jetpackUntil > state.elapsedMs;
 }
-
+function isRushActive() {
+  return state.effects.rushUntil > state.elapsedMs;
+}
 function isRunnerDuckActive() {
   return state.runner.duckUntil > state.elapsedMs;
 }
@@ -1126,7 +1134,11 @@ function activateJetpack(power = -17, duration = jetpackDurationMs) {
   state.player.vy = Math.min(state.player.vy, power);
   addFloatingText("RAKETTPAKKE!", state.player.x + state.player.w / 2, state.player.y - 18, "#ff8c42", 60);
 }
-
+function activateRush(duration = rushDurationMs) {
+  state.effects.rushUntil = Math.max(state.effects.rushUntil, state.elapsedMs + duration);
+  state.player.vx = clamp(state.player.vx * 1.18, -7.8, 7.8);
+  addFloatingText("TURBOBOOST!", state.player.x + state.player.w / 2, state.player.y - 18, "#7dd3fc", 60);
+}
 function activateBananaSurprise() {
   state.skillState.bananaTriggered = true;
   state.effects.bananaUntil = state.elapsedMs + 11000;
@@ -1161,16 +1173,16 @@ function updateMusic() {
   }
 
   const disco = isDiscoActive();
+  const rush = isRushActive();
   const runnerMode = state.mode === "runner";
   const sequence = runnerMode ? music.runnerSequence : disco ? music.discoSequence : getSelectedMap().musicSequence;
   const lookAhead = 0.18;
-  const intensity = Math.min(1, 0.2 + (state.heightScore / 95) + (state.level - 1) * 0.14 + (disco ? 0.3 : 0) + (runnerMode ? 0.2 : 0));
-  const baseBeat = runnerMode ? 0.18 : disco ? 0.16 : 0.25;
+  const intensity = Math.min(1, 0.2 + (state.heightScore / 95) + (state.level - 1) * 0.14 + (disco ? 0.3 : 0) + (rush ? 0.22 : 0) + (runnerMode ? 0.2 : 0));
+  const baseBeat = runnerMode ? 0.18 : rush ? 0.14 : disco ? 0.16 : 0.25;
   const beatLength = state.running ? clamp(baseBeat - intensity * 0.05, 0.11, 0.32) : 0.3;
-
-  music.master.gain.setTargetAtTime(state.running ? (runnerMode ? 0.22 : disco ? 0.24 : 0.18) : 0.1, music.context.currentTime, 0.08);
-  music.leadGain.gain.setTargetAtTime(0.05 + intensity * 0.07, music.context.currentTime, 0.08);
-  music.pulseGain.gain.setTargetAtTime(state.running ? (runnerMode ? 0.065 : disco ? 0.075 : 0.05) : 0.025, music.context.currentTime, 0.08);
+  music.master.gain.setTargetAtTime(state.running ? (runnerMode ? 0.22 : disco ? 0.24 : rush ? 0.21 : 0.18) : 0.1, music.context.currentTime, 0.08);
+  music.leadGain.gain.setTargetAtTime(0.05 + intensity * 0.07 + (rush ? 0.02 : 0), music.context.currentTime, 0.08);
+  music.pulseGain.gain.setTargetAtTime(state.running ? (runnerMode ? 0.065 : disco ? 0.075 : rush ? 0.07 : 0.05) : 0.025, music.context.currentTime, 0.08);
 
   while (music.nextNoteTime < music.context.currentTime + lookAhead) {
     const note = sequence[music.step % sequence.length];
@@ -1284,7 +1296,8 @@ function maybeCreateCollectible(platform) {
   const difficulty = getRunDifficulty();
   const powerupChance = 0.06 + difficulty * 0.08 + rules.collectibleBonus + (isBananaActive() ? 0.14 : 0);
   if (Math.random() < powerupChance) {
-    const type = Math.random() < 0.5 ? "disco" : "jetpack";
+    const roll = Math.random();
+    const type = roll < 0.34 ? "disco" : roll < 0.7 ? "jetpack" : "rush";
     state.collectibles.push({
       type,
       x: platform.x + platform.w / 2 + rand(-18, 18),
@@ -1299,34 +1312,40 @@ function createPlatform(y, guaranteedCenter = false, previousPlatform = null) {
   const platformWidth = getPlatformWidth();
   const difficulty = getRunDifficulty();
   const rules = getMapRules();
-  const movingChance = guaranteedCenter ? 0 : clamp((difficulty - 0.05) * 0.58 + rules.movingPlatformBonus, 0, 0.68);
-  const crackedChance = guaranteedCenter ? 0 : clamp((difficulty - 0.2) * 0.34 + rules.crackedPlatformBonus, 0, 0.38);
-  const bananaPeelChance = (guaranteedCenter || !isBananaActive()) ? 0 : clamp(0.22 + difficulty * 0.08, 0.2, 0.46);
-  const maxOffset = 80 + difficulty * 42;
-  const type = getPlatformType(guaranteedCenter, difficulty);
-
+  const previousWasTricky = previousPlatform && (previousPlatform.type === "phase" || previousPlatform.cracked || previousPlatform.vx);
+  const movingChance = guaranteedCenter ? 0 : clamp((difficulty - 0.05) * 0.58 + rules.movingPlatformBonus - (previousWasTricky ? 0.22 : 0), 0, 0.68);
+  const crackedChance = guaranteedCenter ? 0 : clamp((difficulty - 0.2) * 0.34 + rules.crackedPlatformBonus - (previousWasTricky ? 0.14 : 0), 0, 0.38);
+  const bananaPeelChance = (guaranteedCenter || !isBananaActive()) ? 0 : clamp(0.22 + difficulty * 0.08 - (previousWasTricky ? 0.18 : 0), 0.05, 0.46);
+  const maxOffset = (previousPlatform?.type === "phase" ? 38 : previousWasTricky ? 56 : 80) + difficulty * (previousPlatform?.type === "phase" ? 18 : 42);
+  let type = getPlatformType(guaranteedCenter, difficulty);
+  if (previousPlatform?.type === "phase" && type === "phase") {
+    type = Math.random() < 0.35 ? "boost" : "normal";
+  }
   let x;
   if (guaranteedCenter || !previousPlatform) {
     x = width / 2 - platformWidth / 2;
   } else {
     x = previousPlatform.x + rand(-maxOffset, maxOffset);
+    if (type === "phase") {
+      x = previousPlatform.x + rand(-Math.min(42, maxOffset * 0.7), Math.min(42, maxOffset * 0.7));
+    }
     x = clamp(x, 18, width - platformWidth - 18);
   }
-
   const platform = {
     x,
     y,
-    w: type === "phase" ? Math.max(36, platformWidth - 8) : platformWidth,
+    w: type === "phase" ? Math.min(platformWidth + 10, width - 36) : platformWidth,
     h: platformHeight,
-    vx: Math.random() < movingChance ? rand(0.3, 0.65 + difficulty * 0.3) * (Math.random() < 0.5 ? -1 : 1) : 0,
-    cracked: type === "boost" ? false : Math.random() < crackedChance,
-    peel: Math.random() < bananaPeelChance,
+    vx: type === "phase" ? 0 : Math.random() < movingChance ? rand(0.3, 0.65 + difficulty * 0.3) * (Math.random() < 0.5 ? -1 : 1) : 0,
+    cracked: type === "boost" || type === "phase" ? false : Math.random() < crackedChance,
+    peel: type === "phase" ? false : Math.random() < bananaPeelChance,
     peelUsed: false,
     broken: false,
     type,
-    phaseOffset: rand(0, 1000)
+    phaseOffset: rand(0, phaseCycleMs),
+    safeUntil: type === "phase" ? state.elapsedMs + phaseSpawnGraceMs : 0
   };
-
+  platform.x = clamp(platform.x, 18, width - platform.w - 18);
   maybeCreateCollectible(platform);
   return platform;
 }
@@ -1402,6 +1421,7 @@ function enterRunnerMode() {
   updateTouchButtonsVisibility();
   state.effects.discoUntil = 0;
   state.effects.jetpackUntil = 0;
+  state.effects.rushUntil = 0;
   resetRunnerState();
   state.player.x = runnerPlayerX;
   state.player.y = runnerGroundY - state.player.h;
@@ -1503,6 +1523,7 @@ function resetGame() {
   state.effects.discoUntil = 0;
   state.effects.jetpackUntil = 0;
   state.effects.bananaUntil = 0;
+  state.effects.rushUntil = 0;
   state.floatingTexts = [];
   state.runner.triggered = false;
   state.runner.completed = false;
@@ -1618,6 +1639,10 @@ function collectPickups() {
         extendCombo(1, item.x, item.y, "RAKETTPAKKE!");
         activateJetpack(isBananaActive() ? -22 : -20, isBananaActive() ? 1600 : 1300);
       }
+      if (item.type === "rush") {
+        extendCombo(1, item.x, item.y, "TURBO!");
+        activateRush(isBananaActive() ? 3000 : rushDurationMs);
+      }
     }
   }
 }
@@ -1667,8 +1692,9 @@ function updateJumperPlayer() {
   const moveIntent = getMoveIntent();
   const controlMult = getControlSpeedMultiplier();
   const speedSkillBonus = isSpeedSkillActive() ? 1 : 0;
-  const airAcceleration = (0.36 + difficulty * 0.08 + speedSkillBonus * 0.22 + (isBananaActive() ? 0.18 : 0) + rules.airControlBonus) * controlMult;
-  const maxMoveSpeed = (moveSpeed + difficulty * 0.62 + speedSkillBonus * 2.35 + (isBananaActive() ? 2.2 : 0) + Math.max(0, rules.airControlBonus * 6)) * controlMult;
+  const rushBonus = isRushActive() ? 1 : 0;
+  const airAcceleration = (0.36 + difficulty * 0.08 + speedSkillBonus * 0.22 + rushBonus * 0.28 + (isBananaActive() ? 0.18 : 0) + rules.airControlBonus) * controlMult;
+  const maxMoveSpeed = (moveSpeed + difficulty * 0.62 + speedSkillBonus * 2.35 + rushBonus * 2.6 + (isBananaActive() ? 2.2 : 0) + Math.max(0, rules.airControlBonus * 6)) * controlMult;
   const touchSpeedCap = state.touch.active && isCoarsePointer ? maxMoveSpeed * 1.24 : maxMoveSpeed;
 
   player.bounceSquash *= 0.84;
@@ -1676,11 +1702,13 @@ function updateJumperPlayer() {
   if (Math.abs(moveIntent) > 0.04) {
     player.vx += moveIntent * airAcceleration;
   } else {
-    player.vx *= rules.idleDrag;
+    player.vx *= isRushActive() ? Math.max(0.9, rules.idleDrag + 0.14) : rules.idleDrag;
   }
-
   if (isJetpackActive()) {
     player.vy = Math.min(player.vy, -11.5);
+  }
+  if (isRushActive()) {
+    player.vx *= 1.012;
   }
 
   if (state.progression.selectedSkill === "banana" && !state.skillState.bananaTriggered && state.heightScore >= 900) {
@@ -1694,7 +1722,7 @@ function updateJumperPlayer() {
   }
 
   if (isTinyDramaActive() && state.heightScore >= state.skillState.dramaNextAt) {
-    const dramaLines = ["DRAMATISK!", "FOR ET HOPP", "UHÃ˜RT FLYT", "LITEN HELT", "REN TEATER!"];
+    const dramaLines = ["DRAMATISK!", "FOR ET HOPP", "UHØRT FLYT", "LITEN HELT", "REN TEATER!"];
     state.skillState.dramaNextAt += rand(380, 860);
     addFloatingText(dramaLines[Math.floor(Math.random() * dramaLines.length)], width / 2, state.cameraY + 240, "#ffffff", 40);
   }
@@ -2185,6 +2213,33 @@ function drawCollectibles() {
       ctx.lineTo(item.x, screenY + 22 + Math.sin(state.elapsedMs / 60) * 3);
       ctx.lineTo(item.x + 5, screenY + 12);
       ctx.fill();
+      continue;
+    }
+    if (item.type === "rush") {
+      ctx.save();
+      ctx.translate(item.x, screenY);
+      ctx.fillStyle = "#0f172a";
+      ctx.beginPath();
+      ctx.moveTo(-12, 4);
+      ctx.lineTo(0, -14);
+      ctx.lineTo(12, 4);
+      ctx.lineTo(0, 14);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "#7dd3fc";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-6, 5);
+      ctx.lineTo(0, -6);
+      ctx.lineTo(6, 5);
+      ctx.stroke();
+      ctx.fillStyle = "#38bdf8";
+      ctx.beginPath();
+      ctx.moveTo(-8, 8);
+      ctx.lineTo(0, 18 + Math.sin(state.elapsedMs / 50) * 4);
+      ctx.lineTo(8, 8);
+      ctx.fill();
+      ctx.restore();
     }
   }
 }
@@ -2337,11 +2392,64 @@ function drawRunnerUi() {
   ctx.font = "bold 18px Trebuchet MS";
   ctx.fillText(`Portal om ${remaining} m`, 24, 36);
   ctx.font = "13px Trebuchet MS";
-  ctx.fillText(`${state.runner.variantLabel}  |  Venstre: hopp  HÃ¸yre: dukk`, 24, 56);
-  ctx.fillText(`Banemynter: ${state.runner.collectedCoins}  |  FullfÃ¸r: +${state.runner.clearBonusCoins} bonus`, 24, 74);
+  ctx.fillText(`${state.runner.variantLabel}  |  Venstre: hopp  Høyre: dukk`, 24, 56);
+  ctx.fillText(`Banemynter: ${state.runner.collectedCoins}  |  Fullfør: +${state.runner.clearBonusCoins} bonus`, 24, 74);
   ctx.fillText(`Krasj: -${Math.min(state.coins, state.runner.failCoinPenalty || runnerFailCoinPenalty)} run-mynter  |  Pilar varsler hinder`, 24, 92);
 }
 
+function drawStatusEffects() {
+  if (state.mode === "runner") {
+    return;
+  }
+  const labels = [];
+  if (isRushActive()) {
+    labels.push({ text: "TURBO", color: "#7dd3fc" });
+  }
+  if (isJetpackActive()) {
+    labels.push({ text: "JETPACK", color: "#ffb366" });
+  }
+  if (!labels.length) {
+    return;
+  }
+  ctx.save();
+  ctx.font = "bold 14px Trebuchet MS";
+  let x = 16;
+  for (const label of labels) {
+    const labelWidth = ctx.measureText(label.text).width + 18;
+    ctx.fillStyle = "rgba(15, 23, 42, 0.62)";
+    ctx.fillRect(x, 14, labelWidth, 28);
+    ctx.fillStyle = label.color;
+    ctx.fillText(label.text, x + 9, 33);
+    x += labelWidth + 8;
+  }
+  ctx.restore();
+}
+function drawRushOverlay() {
+  if (!isRushActive() || state.mode === "runner") {
+    return;
+  }
+  const player = state.player;
+  const centerX = player.x + player.w / 2;
+  const centerY = player.y - state.cameraY + player.h / 2;
+  const gradient = ctx.createRadialGradient(centerX, centerY, 26, centerX, centerY, 220);
+  gradient.addColorStop(0, "rgba(0,0,0,0)");
+  gradient.addColorStop(0.34, "rgba(8,15,28,0.05)");
+  gradient.addColorStop(0.7, "rgba(8,15,28,0.42)");
+  gradient.addColorStop(1, "rgba(8,15,28,0.94)");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, width, height);
+  ctx.save();
+  ctx.strokeStyle = "rgba(125, 211, 252, 0.24)";
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 10; i += 1) {
+    const offset = (state.elapsedMs * 0.34 + i * 32) % width;
+    ctx.beginPath();
+    ctx.moveTo(offset, centerY + Math.sin((state.elapsedMs / 90) + i) * 140);
+    ctx.lineTo(offset - 24, centerY + Math.cos((state.elapsedMs / 70) + i) * 36);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
 function drawFrame() {
   drawBackground();
   drawPlatforms();
@@ -2349,6 +2457,8 @@ function drawFrame() {
   drawPlayer();
   drawFloatingTexts();
   drawRunnerUi();
+  drawStatusEffects();
+  drawRushOverlay();
 }
 function loop(timestamp) {
   if (!state.lastFrameTime) {
@@ -2399,7 +2509,7 @@ function startGame() {
     addFloatingText("MAGNETMODUS!", width / 2, state.cameraY + 220, "#ffe066", 65);
   }
   if (state.progression.selectedSkill === "moon_boots") {
-    addFloatingText("MÃ…NESTÃ˜VLER!", width / 2, state.cameraY + 220, "#dbeafe", 65);
+    addFloatingText("MÅNESTØVLER!", width / 2, state.cameraY + 220, "#dbeafe", 65);
   }
   if (state.progression.selectedSkill === "party_hat") {
     addFloatingText("FESTHATT!", width / 2, state.cameraY + 220, "#ff4fd8", 65);
@@ -2478,7 +2588,7 @@ function updateTouchButtonLabels() {
   touchLeftBtnEl.innerHTML = "&#8592;";
   touchRightBtnEl.innerHTML = "&#8594;";
   touchLeftBtnEl.setAttribute("aria-label", "Venstre");
-  touchRightBtnEl.setAttribute("aria-label", "HÃ¸yre");
+  touchRightBtnEl.setAttribute("aria-label", "Høyre");
 }
 
 window.addEventListener("keydown", (event) => {
