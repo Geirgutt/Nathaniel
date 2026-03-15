@@ -80,7 +80,7 @@ const skins = {
   starter: {
     id: "starter",
     name: "Sky Kid",
-    description: "Klassisk helt med rød kappe.",
+    description: "Klassisk helt med r\u00f8d kappe.",
     cost: 0,
     colors: { body: "#1f3c88", cape: "#ff5f6d", visor: "#7dd3fc", accent: "#0f172a" }
   },
@@ -107,7 +107,7 @@ const skins = {
   },
   ghost: {
     id: "ghost",
-    name: "Skyspøk",
+    name: "Skysp\u00f8k",
     description: "Et smilende laken med null respekt for fysikk.",
     cost: 120,
     colors: { body: "#eaf4ff", cape: "#9ad1ff", visor: "#fefefe", accent: "#6b7fa3" }
@@ -115,7 +115,7 @@ const skins = {
   duck: {
     id: "duck",
     name: "Captain Quack",
-    description: "En and med altfor høy selvtillit.",
+    description: "En and med altfor h\u00f8y selvtillit.",
     cost: 135,
     colors: { body: "#ffd23f", cape: "#ff6b6b", visor: "#fff7cc", accent: "#7a4e00" }
   },
@@ -129,9 +129,65 @@ const skins = {
   ninja: {
     id: "ninja",
     name: "Nattnudel",
-    description: "Mørk, dramatisk og litt for stolt.",
+    description: "M\u00f8rk, dramatisk og litt for stolt.",
     cost: 165,
     colors: { body: "#1f2937", cape: "#ef4444", visor: "#fde68a", accent: "#030712" }
+  },
+  banana_orange: {
+    id: "banana_orange",
+    name: "Bananmann med Appelsinhatt",
+    description: "Akkurat s\u00e5 dumt som det burde v\u00e6re.",
+    cost: 190,
+    colors: { body: "#f4d03f", cape: "#ff7b00", visor: "#fff4b8", accent: "#8d5a00" }
+  },
+  shrimp_king: {
+    id: "shrimp_king",
+    name: "Rekekongen",
+    description: "Kongelig skalldyr med null brems.",
+    cost: 210,
+    colors: { body: "#ff8b94", cape: "#ffd166", visor: "#fff1f2", accent: "#8c2f39" }
+  },
+  potato_cowboy: {
+    id: "potato_cowboy",
+    name: "Potet-Cowboy",
+    description: "Rir inn i solnedgangen uten hest.",
+    cost: 240,
+    colors: { body: "#b08968", cape: "#6d4c41", visor: "#fef3c7", accent: "#4e342e" }
+  },
+  sausage_wizard: {
+    id: "sausage_wizard",
+    name: "P\u00f8lse-trollmann",
+    description: "Kaster grillmagi og d\u00e5rlig d\u00f8mmekraft.",
+    cost: 275,
+    colors: { body: "#d97757", cape: "#fbbf24", visor: "#fff7d6", accent: "#7c2d12" }
+  },
+  cone_lord: {
+    id: "cone_lord",
+    name: "Kjeglefyr Deluxe",
+    description: "Halv helt, halv veiarbeid.",
+    cost: 310,
+    colors: { body: "#ff7a00", cape: "#1f2937", visor: "#fff3c4", accent: "#7c2d12" }
+  },
+  grandma_turbo: {
+    id: "grandma_turbo",
+    name: "Bestemor Turbo",
+    description: "Strikker i 300 km/t og nekter \u00e5 roe ned.",
+    cost: 345,
+    colors: { body: "#d8b4fe", cape: "#f472b6", visor: "#fdf2f8", accent: "#6b21a8" }
+  },
+  mop_dj: {
+    id: "mop_dj",
+    name: "DJ Mopp",
+    description: "Vasker gulvet med konkurransen.",
+    cost: 380,
+    colors: { body: "#7dd3fc", cape: "#14b8a6", visor: "#ecfeff", accent: "#164e63" }
+  },
+  cheese_prophet: {
+    id: "cheese_prophet",
+    name: "Osteorakelet",
+    description: "Ser fremtiden i hullost og overdriver alt.",
+    cost: 420,
+    colors: { body: "#facc15", cape: "#fb7185", visor: "#fff9c4", accent: "#854d0e" }
   }
 };
 
@@ -226,7 +282,7 @@ const skills = {
   superspeed: {
     id: "superspeed",
     name: "Superspeed",
-    description: "Kvassere styring og høyere toppfart en stund.",
+    description: "Kvassere styring og h\u00f8yere toppfart en stund.",
     cost: 95
   },
   magnet: {
@@ -237,14 +293,14 @@ const skills = {
   },
   moon_boots: {
     id: "moon_boots",
-    name: "Månestøvler",
+    name: "M\u00e5nest\u00f8vler",
     description: "Litt mykere tyngdekraft og mer svev.",
     cost: 100
   },
   lucky_cat: {
     id: "lucky_cat",
     name: "Lucky Cat",
-    description: "Noen mynter blir plutselig litt bedre enn de burde være.",
+    description: "Noen mynter blir plutselig litt bedre enn de burde v\u00e6re.",
     cost: 110
   },
   party_hat: {
@@ -256,15 +312,14 @@ const skills = {
   tiny_drama: {
     id: "tiny_drama",
     name: "Lite drama",
-    description: "Gir ingen mening, men kommenterer løpet ditt med stil.",
+    description: "Gir ingen mening, men kommenterer l\u00f8pet ditt med stil.",
     cost: 45
   },
-  banana: {
-    id: "banana",
-    name: "Mystisk banan",
-    description: "Ingen vet hva den egentlig gjør. Låses opp ved 5000 m.",
-    cost: 0,
-    unlockScore: 5000
+  airhorn: {
+    id: "airhorn",
+    name: "Lommetuba",
+    description: "Koster 1000 mynter. Starter en komplett tubakatastrofe som er herlig ubalansert.",
+    cost: 1000
   }
 };
 
@@ -401,7 +456,7 @@ function hasSupabaseConfig() {
 }
 
 function repairMojibake(text) {
-  if (typeof text !== "string" || !/[ÃƒÃ‚Ã¢â‚¬]/.test(text)) {
+  if (typeof text !== "string" || !/[ÃƒÆ’Ãƒâ€šÃƒÂ¢Ã¢â€šÂ¬]/.test(text)) {
     return text;
   }
 
@@ -574,10 +629,10 @@ function getRunnerVariantConfig() {
   const rules = getMapRules();
   const variant = chooseWeightedOption(rules.runnerVariantWeights);
   const configs = {
-    classic: { id: "classic", label: "Klassisk", speedBonus: 0, portalShift: 180, lowBias: 0.55, pickupBurst: true, pickupSpacing: [300, 420], reward: 4, failPenalty: 2 },
-    sprint: { id: "sprint", label: "Sprint", speedBonus: 1.15, portalShift: 80, lowBias: 0.72, pickupBurst: true, pickupSpacing: [260, 360], reward: 5, failPenalty: 3 },
-    tunnel: { id: "tunnel", label: "Dukkesone", speedBonus: 0.4, portalShift: 160, lowBias: 0.2, pickupBurst: true, pickupSpacing: [280, 390], reward: 6, failPenalty: 2 },
-    coinrush: { id: "coinrush", label: "Myntjag", speedBonus: 0.3, portalShift: 260, lowBias: 0.55, pickupBurst: true, pickupSpacing: [170, 250], reward: 7, failPenalty: 3 }
+    classic: { id: "classic", label: "Klassisk", speedBonus: 0, portalShift: 220, lowBias: 0.55, pickupBurst: true, pickupSpacing: [320, 450], reward: 4, failPenalty: 2 },
+    sprint: { id: "sprint", label: "Sprint", speedBonus: 0.45, portalShift: 120, lowBias: 0.72, pickupBurst: true, pickupSpacing: [280, 380], reward: 5, failPenalty: 3 },
+    tunnel: { id: "tunnel", label: "Dukkesone", speedBonus: 0.1, portalShift: 180, lowBias: 0.2, pickupBurst: true, pickupSpacing: [300, 410], reward: 6, failPenalty: 2 },
+    coinrush: { id: "coinrush", label: "Myntjag", speedBonus: 0.05, portalShift: 280, lowBias: 0.55, pickupBurst: true, pickupSpacing: [190, 270], reward: 7, failPenalty: 3 }
   };
   return configs[variant] || configs.classic;
 }
@@ -588,30 +643,20 @@ function getPlatformType(guaranteedCenter, difficulty) {
 
   const rules = getMapRules();
   const boostChance = clamp(0.08 + difficulty * 0.12 + rules.boostPlatformBonus, 0.04, 0.3);
-  const phaseChance = clamp(0.03 + difficulty * 0.1 + rules.phasePlatformBonus, 0.02, 0.24);
   const iceChance = clamp(0.05 + difficulty * 0.08 + rules.icePlatformBonus, 0.03, 0.32);
   const roll = Math.random();
 
   if (roll < boostChance) {
     return "boost";
   }
-  if (roll < boostChance + phaseChance) {
-    return "phase";
-  }
-  if (roll < boostChance + phaseChance + iceChance) {
+  if (roll < boostChance + iceChance) {
     return "ice";
   }
   return "normal";
 }
 
 function isPlatformActive(platform) {
-  if (platform.type !== "phase") {
-    return true;
-  }
-  if (platform.safeUntil && state.elapsedMs < platform.safeUntil) {
-    return true;
-  }
-  return ((state.elapsedMs + platform.phaseOffset) % phaseCycleMs) < phaseVisibleMs;
+  return true;
 }
 
 function uniqueList(items) {
@@ -728,7 +773,7 @@ function renderShopCards(container, items, kind) {
       (kind === "skill" && state.progression.selectedSkill === item.id);
     const lockedByScore = Boolean(item.unlockScore && state.bestScore < item.unlockScore && !ownedItem);
 
-    let label = "Kjøp";
+    let label = "K\u00f8p";
     let extraClass = "";
     if (selected) {
       label = "Valgt";
@@ -749,7 +794,7 @@ function renderShopCards(container, items, kind) {
           <strong>${escapeHtml(item.name)}</strong>
           <p>${escapeHtml(item.description)}</p>
           <div class="shop-meta">
-            <span>${escapeHtml(ownedItem ? "Eies" : lockedByScore ? "Låses opp senere" : `Pris: ${item.cost}`)}</span>
+            <span>${escapeHtml(ownedItem ? "Eies" : lockedByScore ? "L\u00e5ses opp senere" : `Pris: ${item.cost}`)}</span>
           </div>
         </div>
         <button
@@ -836,18 +881,7 @@ function purchase(kind, id) {
 }
 
 function unlockBananaIfNeeded(score) {
-  if (state.progression.unlockedBanana || score < 5000) {
-    return false;
-  }
-
-  state.progression.unlockedBanana = true;
-  state.progression.ownedSkills.push("banana");
-  state.progression.ownedSkills = uniqueList(state.progression.ownedSkills);
-  saveProgression();
-  renderShop();
-  updateProfileBar();
-  addFloatingText("MYSTISK BANAN LÅSES OPP!", width / 2, state.cameraY + 180, "#ffe066", 90);
-  return true;
+  return false;
 }
 
 function renderLeaderboard(scores) {
@@ -897,7 +931,7 @@ async function fetchLeaderboard() {
   if (!hasSupabaseConfig()) {
     const scores = readLocalLeaderboard();
     renderLeaderboard(scores);
-    setScoreStatus("Fyll inn Supabase i config.js for delt toppliste. Viser lokal liste foreløpig.");
+    setScoreStatus("Fyll inn Supabase i config.js for delt toppliste. Viser lokal liste forel\u00f8pig.");
     return scores;
   }
 
@@ -941,7 +975,7 @@ async function submitScore() {
 
   const name = getPlayerName();
   if (!name) {
-    setScoreStatus("Skriv inn kallenavn for å lagre score.");
+    setScoreStatus("Skriv inn kallenavn for \u00e5 lagre score.");
     playerNameEl.focus();
     return;
   }
@@ -1032,7 +1066,7 @@ async function showGameOverOverlay() {
     setScoreStatus("Ikke top 10 denne gangen, men her er lista.");
   }
 
-  setOverlay(`Du kom til level ${state.level} og nådde ${score} meter. Banken din er på ${state.progression.bankCoins} mynter.`, "Prøv igjen", true);
+  setOverlay(`Du kom til level ${state.level} og n\u00e5dde ${score} meter. Banken din er p\u00e5 ${state.progression.bankCoins} mynter.`, "Pr\u00f8v igjen", true);
 }
 function ensureMusic() {
   if (music.context) {
@@ -1144,11 +1178,12 @@ function activateBananaSurprise() {
   state.effects.bananaUntil = state.elapsedMs + 11000;
   state.skillState.bananaPulseUntil = state.elapsedMs + 11000;
   activateDisco(11000);
-  activateJetpack(-20.2, 1300);
-  state.progression.bankCoins += 30;
+  activateJetpack(-24.5, 1600);
+  activateRush(-35, 2600);
+  state.progression.bankCoins += 100;
   saveProgression();
   updateProfileBar();
-  addFloatingText("BANANAMANIA MAX!", width / 2, state.cameraY + 200, "#ffe066", 105);
+  addFloatingText("TUBAKATASTROFE!", width / 2, state.cameraY + 200, "#ffe066", 105);
 }
 
 function scheduleTone(type, frequency, startTime, duration, gainNode, volume) {
@@ -1312,38 +1347,31 @@ function createPlatform(y, guaranteedCenter = false, previousPlatform = null) {
   const platformWidth = getPlatformWidth();
   const difficulty = getRunDifficulty();
   const rules = getMapRules();
-  const previousWasTricky = previousPlatform && (previousPlatform.type === "phase" || previousPlatform.cracked || previousPlatform.vx);
+  const previousWasTricky = previousPlatform && (previousPlatform.cracked || previousPlatform.vx);
   const movingChance = guaranteedCenter ? 0 : clamp((difficulty - 0.05) * 0.58 + rules.movingPlatformBonus - (previousWasTricky ? 0.22 : 0), 0, 0.68);
   const crackedChance = guaranteedCenter ? 0 : clamp((difficulty - 0.2) * 0.34 + rules.crackedPlatformBonus - (previousWasTricky ? 0.14 : 0), 0, 0.38);
-  const bananaPeelChance = (guaranteedCenter || !isBananaActive()) ? 0 : clamp(0.22 + difficulty * 0.08 - (previousWasTricky ? 0.18 : 0), 0.05, 0.46);
-  const maxOffset = (previousPlatform?.type === "phase" ? 38 : previousWasTricky ? 56 : 80) + difficulty * (previousPlatform?.type === "phase" ? 18 : 42);
-  let type = getPlatformType(guaranteedCenter, difficulty);
-  if (previousPlatform?.type === "phase" && type === "phase") {
-    type = Math.random() < 0.35 ? "boost" : "normal";
-  }
+  const maxOffset = (previousWasTricky ? 56 : 80) + difficulty * 42;
+  const type = getPlatformType(guaranteedCenter, difficulty);
   let x;
   if (guaranteedCenter || !previousPlatform) {
     x = width / 2 - platformWidth / 2;
   } else {
     x = previousPlatform.x + rand(-maxOffset, maxOffset);
-    if (type === "phase") {
-      x = previousPlatform.x + rand(-Math.min(42, maxOffset * 0.7), Math.min(42, maxOffset * 0.7));
-    }
     x = clamp(x, 18, width - platformWidth - 18);
   }
   const platform = {
     x,
     y,
-    w: type === "phase" ? Math.min(platformWidth + 10, width - 36) : platformWidth,
+    w: platformWidth,
     h: platformHeight,
-    vx: type === "phase" ? 0 : Math.random() < movingChance ? rand(0.3, 0.65 + difficulty * 0.3) * (Math.random() < 0.5 ? -1 : 1) : 0,
-    cracked: type === "boost" || type === "phase" ? false : Math.random() < crackedChance,
-    peel: type === "phase" ? false : Math.random() < bananaPeelChance,
+    vx: Math.random() < movingChance ? rand(0.3, 0.65 + difficulty * 0.3) * (Math.random() < 0.5 ? -1 : 1) : 0,
+    cracked: type === "boost" ? false : Math.random() < crackedChance,
+    peel: false,
     peelUsed: false,
     broken: false,
     type,
     phaseOffset: rand(0, phaseCycleMs),
-    safeUntil: type === "phase" ? state.elapsedMs + phaseSpawnGraceMs : 0
+    safeUntil: 0
   };
   platform.x = clamp(platform.x, 18, width - platform.w - 18);
   maybeCreateCollectible(platform);
@@ -1370,24 +1398,24 @@ function spawnRunnerPickupBurst() {
 function createObstacle() {
   const variant = state.runner.variant;
   const lowBias = state.runner.lowBias || 0.55;
-  const spawnX = width + rand(140, 240);
+  const spawnX = width + rand(220, 340);
   const type = Math.random() < lowBias ? "low" : "high";
   if (type === "low") {
     return {
       type,
       x: spawnX,
       y: runnerGroundY,
-      w: variant === "sprint" ? rand(26, 40) : rand(30, 46),
-      h: variant === "sprint" ? rand(28, 46) : rand(34, 58)
+      w: variant === "sprint" ? rand(34, 48) : rand(40, 56),
+      h: variant === "sprint" ? rand(34, 48) : rand(44, 60)
     };
   }
 
   return {
     type,
     x: spawnX,
-    y: runnerGroundY - rand(variant === "tunnel" ? 34 : 28, variant === "tunnel" ? 44 : 34),
-    w: rand(40, variant === "tunnel" ? 84 : 62),
-    h: rand(18, variant === "tunnel" ? 28 : 24)
+    y: runnerGroundY - rand(28, 34),
+    w: rand(56, variant === "tunnel" ? 94 : 78),
+    h: rand(96, variant === "tunnel" ? 118 : 108)
   };
 }
 
@@ -1396,7 +1424,7 @@ function resetRunnerState() {
   const rules = getMapRules();
   const variantConfig = getRunnerVariantConfig();
   state.runner.distance = 0;
-  state.runner.nextObstacleAt = variantConfig.id === "sprint" ? 620 : 760;
+  state.runner.nextObstacleAt = variantConfig.id === "sprint" ? 780 : 920;
   state.runner.portalDistance = 3200 + (stage - 1) * 320 + rules.runnerPortalShift + variantConfig.portalShift;
   state.runner.variant = variantConfig.id;
   state.runner.variantLabel = variantConfig.label;
@@ -1410,7 +1438,7 @@ function resetRunnerState() {
   state.runner.portal = null;
   state.runner.duckUntil = 0;
   state.runner.obstacleCooldownUntil = 0;
-  state.runner.speed = 6.0 + state.level * 0.22 + stage * 0.42 + rules.runnerSpeedBonus + variantConfig.speedBonus;
+  state.runner.speed = 4.2 + state.level * 0.14 + stage * 0.24 + rules.runnerSpeedBonus * 0.55 + variantConfig.speedBonus;
   state.runner.backgroundOffset = 0;
   state.runner.jumpQueued = false;
   state.runner.duckQueued = false;
@@ -1711,7 +1739,7 @@ function updateJumperPlayer() {
     player.vy = Math.min(player.vy, -11.5);
   }
 
-  if (state.progression.selectedSkill === "banana" && !state.skillState.bananaTriggered && state.heightScore >= 900) {
+  if (state.progression.selectedSkill === "airhorn" && !state.skillState.bananaTriggered && state.heightScore >= 700) {
     activateBananaSurprise();
   }
 
@@ -1722,7 +1750,7 @@ function updateJumperPlayer() {
   }
 
   if (isTinyDramaActive() && state.heightScore >= state.skillState.dramaNextAt) {
-    const dramaLines = ["DRAMATISK!", "FOR ET HOPP", "UHØRT FLYT", "LITEN HELT", "REN TEATER!"];
+    const dramaLines = ["DRAMATISK!", "FOR ET HOPP", "UH\u00d8RT FLYT", "LITEN HELT", "REN TEATER!"];
     state.skillState.dramaNextAt += rand(380, 860);
     addFloatingText(dramaLines[Math.floor(Math.random() * dramaLines.length)], width / 2, state.cameraY + 240, "#ffffff", 40);
   }
@@ -1773,17 +1801,7 @@ function updateJumperPlayer() {
         player.x += platform.vx * 0.6;
       }
 
-      if (platform.peel && !platform.peelUsed) {
-        platform.peelUsed = true;
-        const slipKick = rand(3.2, 5.1) * (Math.random() < 0.5 ? -1 : 1);
-        player.vx = clamp(player.vx + slipKick, -touchSpeedCap * 1.1, touchSpeedCap * 1.1);
-        addFloatingText("SKLIII!", platform.x + platform.w / 2, platform.y - 10, "#ffe066", 44);
-      }
-
-      if (platform.type === "phase") {
-        platform.broken = true;
-        addFloatingText("POFF!", platform.x + platform.w / 2, platform.y - 8, "#c77dff", 30);
-      } else if (platform.cracked) {
+      if (platform.cracked) {
         platform.broken = true;
         addFloatingText("KNAKK!", platform.x + platform.w / 2, platform.y - 8, "#ff6b6b", 34);
       }
@@ -1826,7 +1844,7 @@ function updateRunnerPlayer() {
   const player = state.player;
   const runner = state.runner;
   const duckActive = isRunnerDuckActive();
-  const speed = runner.speed + Math.min(2.6, state.level * 0.24) + Math.min(1.8, (runner.stage - 1) * 0.2);
+  const speed = runner.speed + Math.min(1.4, state.level * 0.12) + Math.min(0.9, (runner.stage - 1) * 0.11);
 
   runner.distance += speed;
   runner.backgroundOffset += speed;
@@ -1865,8 +1883,8 @@ function updateRunnerPlayer() {
 
   if (!runner.portal && runner.distance >= runner.nextObstacleAt) {
     runner.obstacles.push(createObstacle());
-    const baseSpacing = runner.variant === "sprint" ? 320 : 390 - Math.min(120, runner.stage * 14);
-    runner.nextObstacleAt += rand(Math.max(230, baseSpacing), Math.max(350, baseSpacing + 120));
+    const baseSpacing = runner.variant === "sprint" ? 460 : 540 - Math.min(100, runner.stage * 10);
+    runner.nextObstacleAt += rand(Math.max(360, baseSpacing), Math.max(520, baseSpacing + 150));
   }
 
   if (!runner.portal && runner.distance >= runner.nextPickupAt) {
@@ -1929,10 +1947,16 @@ function updateRunnerPlayer() {
   if (state.elapsedMs > runner.obstacleCooldownUntil) {
     for (const obstacle of runner.obstacles) {
       const obstacleTop = obstacle.y - obstacle.h;
-      const hit = playerBox.x < obstacle.x + obstacle.w &&
-        playerBox.x + playerBox.w > obstacle.x &&
-        playerBox.y < obstacle.y &&
-        playerBox.y + playerBox.h > obstacleTop;
+      const overlapX = playerBox.x < obstacle.x + obstacle.w &&
+        playerBox.x + playerBox.w > obstacle.x;
+      let hit = false;
+
+      if (obstacle.type === "low") {
+        hit = overlapX && playerBox.y + playerBox.h > obstacleTop + 2;
+      } else {
+        const grounded = player.y >= runnerGroundY - player.h - 0.5;
+        hit = overlapX && (!duckActive || !grounded || playerBox.y < obstacle.y - 2);
+      }
 
       if (!hit) {
         continue;
@@ -2052,9 +2076,7 @@ function drawPlatforms() {
 
   for (const platform of state.platforms) {
     const screenY = platform.y - state.cameraY;
-    const active = isPlatformActive(platform);
     ctx.save();
-    ctx.globalAlpha = platform.type === "phase" && !active ? 0.25 : 1;
     ctx.fillStyle = platform.type === "boost" ? "#ff8c42" : platform.type === "ice" ? "#7dd3fc" : platform.cracked ? "#8d6f64" : platform.vx ? movingColor : staticColor;
     ctx.fillRect(platform.x, screenY, platform.w, platform.h);
     ctx.fillStyle = platform.type === "boost" ? "#ffe29a" : platform.type === "ice" ? "#effbff" : platform.cracked ? "#d8c0b1" : glowColor;
@@ -2088,20 +2110,6 @@ function drawPlatforms() {
       ctx.lineTo(platform.x + platform.w - 10, screenY + 5);
       ctx.stroke();
     }
-
-    if (platform.peel && !platform.peelUsed) {
-      const peelX = platform.x + platform.w * 0.5;
-      const peelY = screenY - 4;
-      ctx.fillStyle = "#ffe066";
-      ctx.beginPath();
-      ctx.ellipse(peelX, peelY, 11, 6, -0.24, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "#d99b00";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(peelX, peelY, 9, 0.4, 2.7);
-      ctx.stroke();
-    }
     ctx.restore();
   }
 }
@@ -2117,8 +2125,8 @@ function drawCollectibles() {
       ctx.fillStyle = "rgba(0,0,0,0.18)";
       ctx.fillRect(obstacle.x + 4, obstacle.y + 2, obstacle.w - 8, 5);
 
-      if (obstacle.x > width - 150) {
-        const markerY = obstacle.type === "high" ? 102 : 138;
+      if (obstacle.x > width - 240) {
+        const markerY = obstacle.type === "high" ? 98 : 144;
         ctx.fillStyle = obstacle.type === "high" ? "#c77dff" : "#ff6b6b";
         ctx.beginPath();
         ctx.moveTo(width - 18, markerY);
@@ -2126,6 +2134,8 @@ function drawCollectibles() {
         ctx.lineTo(width - 42, markerY + 10);
         ctx.closePath();
         ctx.fill();
+        ctx.font = "bold 14px Trebuchet MS";
+        ctx.fillText(obstacle.type === "high" ? "DUKK" : "HOPP", width - 92, markerY + 5);
       }
     }
 
@@ -2295,7 +2305,22 @@ function drawPlayer() {
   ctx.roundRect(bodyX, bodyY + 8, bodyW, bodyH - 8, 16);
   ctx.fill();
 
-  ctx.fillStyle = skin.id === "melon" ? "#2f6f36" : skin.id === "robot" ? "#d7dee9" : skin.id === "toast" ? "#f4d4a5" : skin.id === "ghost" ? "#f8fbff" : skin.id === "duck" ? "#ffe08a" : skin.id === "disco" ? "#ffd0f4" : skin.id === "ninja" ? "#d1d5db" : "#ffd7a8";
+  ctx.fillStyle = skin.id === "melon" ? "#2f6f36" :
+    skin.id === "robot" ? "#d7dee9" :
+    skin.id === "toast" ? "#f4d4a5" :
+    skin.id === "ghost" ? "#f8fbff" :
+    skin.id === "duck" ? "#ffe08a" :
+    skin.id === "disco" ? "#ffd0f4" :
+    skin.id === "ninja" ? "#d1d5db" :
+    skin.id === "banana_orange" ? "#ffe066" :
+    skin.id === "shrimp_king" ? "#ffd6db" :
+    skin.id === "potato_cowboy" ? "#d6b690" :
+    skin.id === "sausage_wizard" ? "#ffc6a0" :
+    skin.id === "cone_lord" ? "#ffe3bf" :
+    skin.id === "grandma_turbo" ? "#f5d0fe" :
+    skin.id === "mop_dj" ? "#cffafe" :
+    skin.id === "cheese_prophet" ? "#fff3b0" :
+    "#ffd7a8";
   ctx.beginPath();
   ctx.arc(screenX + player.w / 2, bodyY + 14, 12, 0, Math.PI * 2);
   ctx.fill();
@@ -2369,6 +2394,64 @@ function drawPlayer() {
     ctx.fillStyle = "#111827";
     ctx.fillRect(screenX + 8, bodyY + 20, player.w - 16, 10);
   }
+  if (skin.id === "banana_orange") {
+    ctx.fillStyle = "#fb8500";
+    ctx.beginPath();
+    ctx.arc(screenX + player.w / 2, bodyY + 2, 10, Math.PI, Math.PI * 2);
+    ctx.fill();
+  }
+  if (skin.id === "shrimp_king") {
+    ctx.strokeStyle = "#ffd166";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(screenX + 12, bodyY + 6);
+    ctx.lineTo(screenX + 18, bodyY - 2);
+    ctx.lineTo(screenX + 24, bodyY + 6);
+    ctx.lineTo(screenX + 30, bodyY - 2);
+    ctx.lineTo(screenX + 36, bodyY + 6);
+    ctx.stroke();
+  }
+  if (skin.id === "potato_cowboy") {
+    ctx.fillStyle = "#6d4c41";
+    ctx.fillRect(screenX + 8, bodyY + 2, player.w - 16, 4);
+    ctx.fillRect(screenX + 14, bodyY - 2, player.w - 28, 6);
+  }
+  if (skin.id === "sausage_wizard") {
+    ctx.fillStyle = "#fbbf24";
+    ctx.beginPath();
+    ctx.moveTo(screenX + player.w / 2, bodyY - 4);
+    ctx.lineTo(screenX + player.w / 2 + 10, bodyY + 10);
+    ctx.lineTo(screenX + player.w / 2 - 10, bodyY + 10);
+    ctx.closePath();
+    ctx.fill();
+  }
+  if (skin.id === "cone_lord") {
+    ctx.fillStyle = "#fff3bf";
+    ctx.fillRect(screenX + 14, bodyY + 2, player.w - 28, 3);
+  }
+  if (skin.id === "grandma_turbo") {
+    ctx.fillStyle = "#f8fafc";
+    ctx.beginPath();
+    ctx.arc(screenX + player.w / 2, bodyY + 4, 8, Math.PI, Math.PI * 2);
+    ctx.fill();
+  }
+  if (skin.id === "mop_dj") {
+    ctx.strokeStyle = "#164e63";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(screenX + 14, bodyY + 6, 5, 0, Math.PI * 2);
+    ctx.arc(screenX + player.w - 14, bodyY + 6, 5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  if (skin.id === "cheese_prophet") {
+    ctx.fillStyle = "#fde047";
+    ctx.beginPath();
+    ctx.moveTo(screenX + 10, bodyY + 10);
+    ctx.lineTo(screenX + player.w - 10, bodyY + 6);
+    ctx.lineTo(screenX + player.w - 14, bodyY + 18);
+    ctx.closePath();
+    ctx.fill();
+  }
 
   ctx.moveTo(screenX + 12, bodyY + bodyH - 2);
   ctx.lineTo(screenX + 10, bodyY + bodyH + 9);
@@ -2389,8 +2472,8 @@ function drawRunnerUi() {
   ctx.font = "bold 18px Trebuchet MS";
   ctx.fillText(`Portal om ${remaining} m`, 24, 36);
   ctx.font = "13px Trebuchet MS";
-  ctx.fillText(`${state.runner.variantLabel}  |  Venstre: hopp  Høyre: dukk`, 24, 56);
-  ctx.fillText(`Banemynter: ${state.runner.collectedCoins}  |  Fullfør: +${state.runner.clearBonusCoins} bonus`, 24, 74);
+  ctx.fillText(`${state.runner.variantLabel}  |  Venstre: hopp  H\u00f8yre: dukk`, 24, 56);
+  ctx.fillText(`Banemynter: ${state.runner.collectedCoins}  |  Fullf\u00f8r: +${state.runner.clearBonusCoins} bonus`, 24, 74);
   ctx.fillText(`Krasj: -${Math.min(state.coins, state.runner.failCoinPenalty || runnerFailCoinPenalty)} run-mynter  |  Pilar varsler hinder`, 24, 92);
 }
 
@@ -2506,7 +2589,7 @@ function startGame() {
     addFloatingText("MAGNETMODUS!", width / 2, state.cameraY + 220, "#ffe066", 65);
   }
   if (state.progression.selectedSkill === "moon_boots") {
-    addFloatingText("MÅNESTØVLER!", width / 2, state.cameraY + 220, "#dbeafe", 65);
+    addFloatingText("M\u00c5NEST\u00d8VLER!", width / 2, state.cameraY + 220, "#dbeafe", 65);
   }
   if (state.progression.selectedSkill === "party_hat") {
     addFloatingText("FESTHATT!", width / 2, state.cameraY + 220, "#ff4fd8", 65);
@@ -2585,7 +2668,7 @@ function updateTouchButtonLabels() {
   touchLeftBtnEl.innerHTML = "&#8592;";
   touchRightBtnEl.innerHTML = "&#8594;";
   touchLeftBtnEl.setAttribute("aria-label", "Venstre");
-  touchRightBtnEl.setAttribute("aria-label", "Høyre");
+  touchRightBtnEl.setAttribute("aria-label", "H\u00f8yre");
 }
 
 window.addEventListener("keydown", (event) => {
@@ -2897,4 +2980,5 @@ updateControlModeUi();
 updateTouchButtonsVisibility();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
 
