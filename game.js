@@ -1977,7 +1977,7 @@ function updateJumperPlayer() {
 
   if (player.x + player.w < 0) {
     player.x = width;
-  } else if (isSecretHintWindow() && player.x > width + 18) {
+  } else if (isSecretHintWindow() && player.x + player.w > width + 18) {
     enterSecretRoom();
     return;
   } else if (player.x > width) {
