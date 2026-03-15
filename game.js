@@ -2228,19 +2228,47 @@ function drawBackground() {
 
   if (state.mode === "secret") {
     const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, "#20103a");
-    gradient.addColorStop(1, "#4a2d72");
+    gradient.addColorStop(0, "#12081f");
+    gradient.addColorStop(0.6, "#34164f");
+    gradient.addColorStop(1, "#6d3a7f");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
-    ctx.fillStyle = "rgba(255,255,255,0.06)";
-    for (let i = 0; i < 8; i += 1) {
-      ctx.fillRect(22 + i * 42, 54 + (i % 2) * 16, 18, 18);
+
+    for (let i = 0; i < 18; i += 1) {
+      const sparkX = (i * 29 + (state.elapsedMs * 0.05)) % (width + 40) - 20;
+      const sparkY = 38 + (i * 31) % (height - 180);
+      ctx.fillStyle = `hsla(${36 + (i % 4) * 12}, 95%, 72%, 0.12)`;
+      ctx.beginPath();
+      ctx.arc(sparkX, sparkY, 2 + (i % 3), 0, Math.PI * 2);
+      ctx.fill();
     }
-    ctx.fillStyle = "#5b3a82";
-    ctx.fillRect(0, height - 110, width, 110);
-    ctx.fillStyle = "#7c59a1";
-    ctx.fillRect(18, 38, width - 36, height - 176);
-    ctx.clearRect(34, 54, width - 68, height - 210);
+
+    ctx.fillStyle = "#4b275f";
+    ctx.fillRect(12, 28, width - 24, height - 144);
+    ctx.fillStyle = "#241036";
+    ctx.fillRect(28, 44, width - 56, height - 176);
+
+    ctx.fillStyle = "rgba(255, 214, 102, 0.16)";
+    for (let i = 0; i < 5; i += 1) {
+      ctx.beginPath();
+      ctx.arc(74 + i * 62, 72 + (i % 2) * 10, 15, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = "#7c5a33";
+    ctx.fillRect(0, height - 112, width, 112);
+    ctx.fillStyle = "#8f6b3d";
+    for (let i = 0; i < 11; i += 1) {
+      ctx.fillRect(i * 36, height - 112 + (i % 2) * 8, 22, 112);
+    }
+
+    ctx.fillStyle = "rgba(255, 225, 140, 0.14)";
+    ctx.beginPath();
+    ctx.moveTo(width / 2, 54);
+    ctx.lineTo(width / 2 - 90, height - 112);
+    ctx.lineTo(width / 2 + 90, height - 112);
+    ctx.closePath();
+    ctx.fill();
     return;
   }
 
@@ -2337,19 +2365,22 @@ function drawBackground() {
   }
 
   if (isSecretHintWindow()) {
-    const hintX = width - 22;
+    const hintX = width - 24;
     const hintY = 122 + Math.sin(state.elapsedMs / 190) * 8;
-    ctx.fillStyle = "rgba(255, 230, 120, 0.16)";
+    const swirl = Math.sin(state.elapsedMs / 120) * 5;
+    ctx.fillStyle = "rgba(255, 230, 120, 0.12)";
     ctx.beginPath();
-    ctx.arc(hintX - 6, hintY, 16, 0, Math.PI * 2);
+    ctx.arc(hintX - 8, hintY, 22, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = "rgba(255, 245, 180, 0.35)";
+    ctx.strokeStyle = "rgba(255, 245, 180, 0.42)";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(width - 34, hintY - 10);
-    ctx.lineTo(width - 12, hintY);
-    ctx.lineTo(width - 34, hintY + 10);
+    ctx.moveTo(width - 38, hintY - 12);
+    ctx.quadraticCurveTo(width - 8 + swirl, hintY, width - 38, hintY + 12);
     ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.font = "bold 12px Trebuchet MS";
+    ctx.fillText("?", width - 18, hintY + 4);
   }
 }
 
@@ -2457,6 +2488,13 @@ function drawCollectibles() {
 
     for (const pickup of state.runner.pickups) {
       const pulse = 1 + Math.sin((state.elapsedMs / 120) + pickup.x * 0.02) * 0.08;
+      const glow = ctx.createRadialGradient(pickup.x, pickup.y, 2, pickup.x, pickup.y, pickup.r * 2.4);
+      glow.addColorStop(0, "rgba(255,245,180,0.55)");
+      glow.addColorStop(1, "rgba(255,245,180,0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(pickup.x, pickup.y, pickup.r * 2.4, 0, Math.PI * 2);
+      ctx.fill();
       ctx.fillStyle = "#ffe066";
       ctx.beginPath();
       ctx.arc(pickup.x, pickup.y, pickup.r * pulse, 0, Math.PI * 2);
@@ -2465,30 +2503,46 @@ function drawCollectibles() {
       ctx.beginPath();
       ctx.arc(pickup.x - 2, pickup.y - 2, pickup.r * 0.45, 0, Math.PI * 2);
       ctx.fill();
+      ctx.strokeStyle = "rgba(122, 77, 0, 0.45)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(pickup.x, pickup.y, pickup.r * 0.72, 0, Math.PI * 2);
+      ctx.stroke();
       if ((pickup.value || 1) > 1) {
         ctx.fillStyle = "#7a4d00";
         ctx.font = "bold 12px Trebuchet MS";
-        ctx.fillText("2", pickup.x - 3, pickup.y + 4);
+        ctx.fillText(String(pickup.value), pickup.x - 3, pickup.y + 4);
       }
     }
 
     if (state.runner.portal) {
       const portal = state.runner.portal;
+      const wobble = 1 + Math.sin(state.elapsedMs / 110) * 0.05;
       ctx.save();
       ctx.translate(portal.x + portal.w / 2, portal.y + portal.h / 2);
       ctx.rotate((state.elapsedMs / 250) % (Math.PI * 2));
-      const gradient = ctx.createRadialGradient(0, 0, 8, 0, 0, portal.w);
-      gradient.addColorStop(0, "rgba(255,255,255,0.9)");
-      gradient.addColorStop(0.4, "rgba(0,209,255,0.75)");
-      gradient.addColorStop(1, "rgba(124,58,237,0.08)");
+      const gradient = ctx.createRadialGradient(0, 0, 6, 0, 0, portal.w * 1.1);
+      gradient.addColorStop(0, "rgba(255,255,255,0.98)");
+      gradient.addColorStop(0.22, "rgba(144,224,255,0.85)");
+      gradient.addColorStop(0.55, "rgba(0,209,255,0.5)");
+      gradient.addColorStop(1, "rgba(124,58,237,0)");
       ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.ellipse(0, 0, portal.w * 0.75, portal.h * 0.52, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, portal.w * 0.95 * wobble, portal.h * 0.62 * wobble, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.7)";
+      for (let i = 0; i < 6; i += 1) {
+        ctx.rotate(Math.PI / 3);
+        ctx.strokeStyle = `hsla(${190 + i * 18}, 95%, 72%, 0.68)`;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(portal.w * 0.08, 0);
+        ctx.lineTo(portal.w * 0.48, 0);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = "rgba(255,255,255,0.78)";
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.ellipse(0, 0, portal.w * 0.55, portal.h * 0.36, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, portal.w * 0.58, portal.h * 0.38, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
@@ -2804,15 +2858,25 @@ function drawRunnerUi() {
   }
 
   const remaining = Math.max(0, Math.floor((state.runner.portalDistance - state.runner.distance) / 10));
-  ctx.fillStyle = "rgba(15, 23, 42, 0.6)";
-  ctx.fillRect(14, 14, 336, 92);
+  const panelGradient = ctx.createLinearGradient(14, 14, 350, 106);
+  panelGradient.addColorStop(0, "rgba(10, 20, 38, 0.82)");
+  panelGradient.addColorStop(1, "rgba(26, 45, 72, 0.62)");
+  ctx.fillStyle = panelGradient;
+  ctx.fillRect(14, 14, 344, 98);
+  ctx.fillStyle = "rgba(125, 211, 252, 0.2)";
+  ctx.fillRect(14, 14, 344, 8);
   ctx.fillStyle = "#ffffff";
   ctx.font = "bold 18px Trebuchet MS";
-  ctx.fillText(`Portal om ${remaining} m`, 24, 36);
+  ctx.fillText(`Portal om ${remaining} m`, 24, 38);
+  ctx.fillStyle = "#7dd3fc";
+  ctx.font = "bold 13px Trebuchet MS";
+  ctx.fillText(state.runner.variantLabel.toUpperCase(), 252, 38);
+  ctx.fillStyle = "#dbeafe";
   ctx.font = "13px Trebuchet MS";
-  ctx.fillText(`${state.runner.variantLabel}  |  Venstre: hopp  H\u00f8yre: dukk`, 24, 56);
-  ctx.fillText(`Banemynter: ${state.runner.collectedCoins}  |  Fullf\u00f8r: +${state.runner.clearBonusCoins} bonus`, 24, 74);
-  ctx.fillText(`Krasj: -${Math.min(state.coins, state.runner.failCoinPenalty || runnerFailCoinPenalty)} run-mynter  |  Pilar varsler hinder`, 24, 92);
+  ctx.fillText(`Venstre: hopp   H\u00f8yre: dukk`, 24, 58);
+  ctx.fillText(`Banemynter: ${state.runner.collectedCoins}   Fullf\u00f8r: +${state.runner.clearBonusCoins} bonus`, 24, 78);
+  ctx.fillStyle = "#fecdd3";
+  ctx.fillText(`Krasj: -${Math.min(state.coins, state.runner.failCoinPenalty || runnerFailCoinPenalty)} run-mynter`, 24, 98);
 }
 
 function drawStatusEffects() {
@@ -2871,22 +2935,40 @@ function drawRushOverlay() {
 function drawSpecialModeUi() {
   if (state.mode === "secret") {
     ctx.save();
+    ctx.fillStyle = "rgba(14, 8, 28, 0.5)";
+    ctx.fillRect(24, height - 156, 72, 82);
     ctx.fillStyle = "#2d1b46";
     ctx.fillRect(34, height - 150, 54, 74);
     ctx.fillStyle = "#ffe066";
     ctx.font = "bold 14px Trebuchet MS";
     ctx.fillText("UT", 48, height - 108);
+    ctx.fillStyle = "rgba(255,230,102,0.24)";
+    ctx.fillRect(56, height - 140, 10, 54);
 
     const chestX = width / 2 - 46;
     const chestY = height - 186;
+    const chestGlow = ctx.createRadialGradient(width / 2, chestY + 20, 8, width / 2, chestY + 20, 92);
+    chestGlow.addColorStop(0, state.secret.rewardClaimed ? "rgba(255,255,255,0.18)" : "rgba(255,224,138,0.32)");
+    chestGlow.addColorStop(1, "rgba(255,224,138,0)");
+    ctx.fillStyle = chestGlow;
+    ctx.fillRect(chestX - 30, chestY - 36, 152, 116);
     ctx.fillStyle = state.secret.rewardClaimed ? "#8d6f64" : "#c08457";
     ctx.fillRect(chestX, chestY, 92, 44);
     ctx.fillStyle = state.secret.rewardClaimed ? "#9ca3af" : "#fbbf24";
     ctx.fillRect(chestX - 4, chestY - 14, 100, 18);
+    ctx.fillStyle = state.secret.rewardClaimed ? "#6b7280" : "#fff3bf";
+    ctx.fillRect(chestX + 38, chestY - 6, 16, 18);
     ctx.strokeStyle = "rgba(255,255,255,0.25)";
     ctx.strokeRect(chestX, chestY, 92, 44);
 
     for (const coin of state.secret.roomCoins) {
+      const glow = ctx.createRadialGradient(coin.x, coin.y, 2, coin.x, coin.y, coin.r * 2.2);
+      glow.addColorStop(0, "rgba(255,245,180,0.45)");
+      glow.addColorStop(1, "rgba(255,245,180,0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(coin.x, coin.y, coin.r * 2, 0, Math.PI * 2);
+      ctx.fill();
       ctx.fillStyle = "#ffd166";
       ctx.beginPath();
       ctx.arc(coin.x, coin.y, coin.r, 0, Math.PI * 2);
@@ -2895,8 +2977,11 @@ function drawSpecialModeUi() {
       ctx.fillRect(coin.x - 1, coin.y - coin.r + 2, 2, coin.r - 1);
     }
 
-    ctx.fillStyle = "rgba(13, 18, 34, 0.72)";
-    ctx.fillRect(16, 16, 310, 92);
+    const panel = ctx.createLinearGradient(16, 16, 326, 108);
+    panel.addColorStop(0, "rgba(13, 18, 34, 0.82)");
+    panel.addColorStop(1, "rgba(52, 22, 79, 0.72)");
+    ctx.fillStyle = panel;
+    ctx.fillRect(16, 16, 316, 96);
     ctx.fillStyle = "#ffe066";
     ctx.font = "bold 22px Trebuchet MS";
     ctx.fillText("Hemmelig rom", 30, 42);
@@ -2913,6 +2998,13 @@ function drawSpecialModeUi() {
     ctx.save();
     for (const pickup of state.coinDash.pickups) {
       if (pickup.type === "coin") {
+        const glow = ctx.createRadialGradient(pickup.x, pickup.y, 2, pickup.x, pickup.y, pickup.r * 2.4);
+        glow.addColorStop(0, pickup.value >= 5 ? "rgba(255,255,200,0.55)" : "rgba(255,220,120,0.45)");
+        glow.addColorStop(1, "rgba(255,220,120,0)");
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(pickup.x, pickup.y, pickup.r * 2.1, 0, Math.PI * 2);
+        ctx.fill();
         ctx.fillStyle = pickup.value >= 5 ? "#fff0a6" : "#ffd166";
         ctx.beginPath();
         ctx.arc(pickup.x, pickup.y, pickup.r, 0, Math.PI * 2);
@@ -2920,15 +3012,22 @@ function drawSpecialModeUi() {
         ctx.fillStyle = "rgba(255,255,255,0.38)";
         ctx.fillRect(pickup.x - 1, pickup.y - pickup.r + 2, 2, pickup.r - 1);
       } else {
+        ctx.save();
+        ctx.translate(pickup.x, pickup.y);
+        ctx.rotate((pickup.y / 40) % (Math.PI * 2));
         ctx.fillStyle = "#9ca3af";
-        ctx.fillRect(pickup.x - pickup.r, pickup.y - pickup.r, pickup.r * 2, pickup.r * 2);
+        ctx.fillRect(-pickup.r, -pickup.r, pickup.r * 2, pickup.r * 2);
         ctx.fillStyle = "#475569";
-        ctx.fillRect(pickup.x - pickup.r + 3, pickup.y - 2, pickup.r * 2 - 6, 4);
+        ctx.fillRect(-pickup.r + 3, -2, pickup.r * 2 - 6, 4);
+        ctx.restore();
       }
     }
 
-    ctx.fillStyle = "rgba(13, 18, 34, 0.72)";
-    ctx.fillRect(16, 16, 320, 98);
+    const panel = ctx.createLinearGradient(16, 16, 338, 116);
+    panel.addColorStop(0, "rgba(13, 18, 34, 0.82)");
+    panel.addColorStop(1, "rgba(12, 58, 84, 0.72)");
+    ctx.fillStyle = panel;
+    ctx.fillRect(16, 16, 324, 98);
     ctx.fillStyle = "#ffe066";
     ctx.font = "bold 22px Trebuchet MS";
     ctx.fillText("Coin Dash", 30, 42);
@@ -3398,6 +3497,12 @@ updateControlModeUi();
 updateTouchButtonsVisibility();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
+
+
+
+
 
 
 
