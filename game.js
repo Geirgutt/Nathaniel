@@ -2508,7 +2508,7 @@ function drawCollectibles() {
       ctx.beginPath();
       ctx.arc(item.x, screenY, item.r * pulse, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "#fff0b3";
+      ctx.fillStyle = "#fff3bf";
       ctx.beginPath();
       ctx.arc(item.x - 2, screenY - 2, item.r * 0.45, 0, Math.PI * 2);
       ctx.fill();
@@ -2521,33 +2521,51 @@ function drawCollectibles() {
     }
 
     if (item.type === "disco") {
-      ctx.fillStyle = "#ff4fd8";
-      ctx.beginPath();
-      ctx.arc(item.x, screenY, item.r * pulse, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#fff";
+      ctx.save();
+      ctx.translate(item.x, screenY);
+      ctx.rotate(state.elapsedMs / 260);
       for (let i = 0; i < 4; i += 1) {
-        ctx.fillRect(item.x - 6 + i * 4, screenY - 5 + (i % 2) * 3, 2, 2);
+        ctx.fillStyle = `hsl(${(state.elapsedMs / 6 + i * 90) % 360}, 90%, 65%)`;
+        ctx.fillRect(-4, -14, 8, 28);
+        ctx.rotate(Math.PI / 4);
       }
+      ctx.restore();
       continue;
     }
 
     if (item.type === "jetpack") {
       ctx.fillStyle = "#ff8c42";
-      ctx.fillRect(item.x - 8, screenY - 10, 16, 20);
-      ctx.fillStyle = "#fff0b3";
-      ctx.fillRect(item.x - 5, screenY - 6, 10, 6);
+      ctx.fillRect(item.x - 10, screenY - 12, 20, 24);
+      ctx.fillStyle = "#4f5d75";
+      ctx.fillRect(item.x - 6, screenY - 8, 4, 16);
+      ctx.fillRect(item.x + 2, screenY - 8, 4, 16);
+      ctx.fillStyle = "#ffd166";
+      ctx.beginPath();
+      ctx.moveTo(item.x - 5, screenY + 12);
+      ctx.lineTo(item.x, screenY + 22 + Math.sin(state.elapsedMs / 60) * 3);
+      ctx.lineTo(item.x + 5, screenY + 12);
+      ctx.fill();
       continue;
     }
 
     if (item.type === "rush") {
       ctx.fillStyle = "#7dd3fc";
+      ctx.fillRect(item.x - 13, screenY - 15, 26, 30);
+      ctx.fillStyle = "#1e3a5f";
+      ctx.fillRect(item.x - 8, screenY - 10, 5, 20);
+      ctx.fillRect(item.x + 3, screenY - 10, 5, 20);
+      ctx.fillStyle = "#dbeafe";
+      ctx.fillRect(item.x - 4, screenY - 18, 8, 8);
+      ctx.fillStyle = "#38bdf8";
       ctx.beginPath();
-      ctx.moveTo(item.x, screenY - 12);
-      ctx.lineTo(item.x + 10, screenY + 8);
-      ctx.lineTo(item.x, screenY + 3);
-      ctx.lineTo(item.x - 10, screenY + 8);
-      ctx.closePath();
+      ctx.moveTo(item.x - 8, screenY + 14);
+      ctx.lineTo(item.x - 2, screenY + 30 + Math.sin(state.elapsedMs / 45) * 4);
+      ctx.lineTo(item.x + 1, screenY + 16);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(item.x + 8, screenY + 14);
+      ctx.lineTo(item.x + 2, screenY + 30 + Math.sin(state.elapsedMs / 45 + 1) * 4);
+      ctx.lineTo(item.x - 1, screenY + 16);
       ctx.fill();
     }
   }
@@ -3380,6 +3398,7 @@ updateControlModeUi();
 updateTouchButtonsVisibility();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
 
 
 
