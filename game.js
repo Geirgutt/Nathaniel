@@ -2649,11 +2649,13 @@ function drawPlayer() {
   const catastropheScale = isAirhornCatastropheActive() ? 1.32 + Math.sin(state.elapsedMs / 90) * 0.06 : 1;
   const squash = 1 + player.bounceSquash * 0.12;
   const stretch = 1 - player.bounceSquash * 0.08;
-  const bodyW = player.w * squash * catastropheScale;
   const ducking = state.mode === "runner" && isRunnerDuckActive();
+  const idleBob = ducking ? 0 : Math.sin(state.elapsedMs / 140) * 1.8;
+  const swagger = Math.sin(state.elapsedMs / 180) * 2.5;
+  const bodyW = player.w * squash * catastropheScale;
   const bodyH = player.h * stretch * (ducking ? 0.68 : 1) * catastropheScale;
   const bodyX = screenX - (bodyW - player.w) / 2;
-  const bodyY = screenY + (player.h - bodyH) + (ducking ? 8 : 0) - (catastropheScale - 1) * 10;
+  const bodyY = screenY + (player.h - bodyH) + (ducking ? 8 : 0) - (catastropheScale - 1) * 10 + idleBob;
   const disco = isDiscoActive();
 
   if ((isJetpackActive() || isRushActive()) && state.mode !== "runner") {
@@ -2677,10 +2679,20 @@ function drawPlayer() {
     ctx.fillRect(screenX - 10, screenY + 26, player.w + 20, 10);
   }
 
+  const bodyGlow = ctx.createRadialGradient(bodyX + bodyW / 2, bodyY + bodyH / 2, 10, bodyX + bodyW / 2, bodyY + bodyH / 2, Math.max(bodyW, bodyH));
+  bodyGlow.addColorStop(0, disco ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.08)");
+  bodyGlow.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = bodyGlow;
+  ctx.beginPath();
+  ctx.roundRect(bodyX - 8, bodyY + 2, bodyW + 16, bodyH + 8, 22);
+  ctx.fill();
+
   ctx.fillStyle = disco ? `hsl(${(state.elapsedMs / 6) % 360}, 80%, 52%)` : skin.colors.body;
   ctx.beginPath();
   ctx.roundRect(bodyX, bodyY + 8, bodyW, bodyH - 8, 16);
   ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  ctx.fillRect(bodyX + 6, bodyY + 12, Math.max(10, bodyW * 0.2), Math.max(14, bodyH * 0.4));
 
   ctx.fillStyle = skin.id === "melon" ? "#2f6f36" :
     skin.id === "robot" ? "#d7dee9" :
@@ -2722,9 +2734,9 @@ function drawPlayer() {
   ctx.fillStyle = disco ? "#ff4fd8" : skin.colors.cape;
   ctx.beginPath();
   ctx.moveTo(screenX + 5, bodyY + 24);
-  ctx.lineTo(screenX + player.w - 5, bodyY + 22);
-  ctx.lineTo(screenX + player.w - 8, bodyY + 30);
-  ctx.lineTo(screenX + 8, bodyY + 32);
+  ctx.lineTo(screenX + player.w - 5, bodyY + 22 + Math.sin(state.elapsedMs / 120) * 1.4);
+  ctx.lineTo(screenX + player.w - 8, bodyY + 30 + Math.sin(state.elapsedMs / 100 + 0.8) * 2.2);
+  ctx.lineTo(screenX + 8, bodyY + 32 + Math.sin(state.elapsedMs / 100) * 2.2);
   ctx.fill();
 
   if (isAirhornCatastropheActive()) {
@@ -2791,6 +2803,11 @@ function drawPlayer() {
     ctx.beginPath();
     ctx.arc(screenX + player.w / 2, bodyY + 2, 10, Math.PI, Math.PI * 2);
     ctx.fill();
+    ctx.fillStyle = "#ffb703";
+    ctx.beginPath();
+    ctx.arc(screenX + player.w / 2 - 7, bodyY + 1, 3, 0, Math.PI * 2);
+    ctx.arc(screenX + player.w / 2 + 7, bodyY + 1, 3, 0, Math.PI * 2);
+    ctx.fill();
   }
   if (skin.id === "shrimp_king") {
     ctx.strokeStyle = "#ffd166";
@@ -2798,15 +2815,22 @@ function drawPlayer() {
     ctx.beginPath();
     ctx.moveTo(screenX + 12, bodyY + 6);
     ctx.lineTo(screenX + 18, bodyY - 2);
-    ctx.lineTo(screenX + 24, bodyY + 6);
+    ctx.lineTo(screenX + 24, bodyY + 6 + Math.sin(state.elapsedMs / 130) * 1.2);
     ctx.lineTo(screenX + 30, bodyY - 2);
     ctx.lineTo(screenX + 36, bodyY + 6);
+    ctx.stroke();
+    ctx.strokeStyle = "#fb7185";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(screenX + player.w / 2, bodyY + 18, 10, -0.2, 1.4);
     ctx.stroke();
   }
   if (skin.id === "potato_cowboy") {
     ctx.fillStyle = "#6d4c41";
     ctx.fillRect(screenX + 8, bodyY + 2, player.w - 16, 4);
     ctx.fillRect(screenX + 14, bodyY - 2, player.w - 28, 6);
+    ctx.fillStyle = "#3b2416";
+    ctx.fillRect(screenX + player.w / 2 - 7, bodyY + 18, 14, 3);
   }
   if (skin.id === "sausage_wizard") {
     ctx.fillStyle = "#fbbf24";
@@ -2816,16 +2840,33 @@ function drawPlayer() {
     ctx.lineTo(screenX + player.w / 2 - 10, bodyY + 10);
     ctx.closePath();
     ctx.fill();
+    ctx.fillStyle = "rgba(255,224,138,0.55)";
+    for (let i = 0; i < 3; i += 1) {
+      ctx.fillRect(screenX + player.w / 2 - 1, bodyY - 10 - i * 6 - Math.sin(state.elapsedMs / 90 + i) * 2, 2, 4);
+    }
   }
   if (skin.id === "cone_lord") {
     ctx.fillStyle = "#fff3bf";
     ctx.fillRect(screenX + 14, bodyY + 2, player.w - 28, 3);
+    ctx.fillStyle = "#ff7a00";
+    ctx.beginPath();
+    ctx.moveTo(screenX + player.w / 2, bodyY - 8);
+    ctx.lineTo(screenX + player.w / 2 + 10, bodyY + 8);
+    ctx.lineTo(screenX + player.w / 2 - 10, bodyY + 8);
+    ctx.closePath();
+    ctx.fill();
   }
   if (skin.id === "grandma_turbo") {
     ctx.fillStyle = "#f8fafc";
     ctx.beginPath();
     ctx.arc(screenX + player.w / 2, bodyY + 4, 8, Math.PI, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = "#334155";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(screenX + 14, bodyY + 14, 4, 0, Math.PI * 2);
+    ctx.arc(screenX + player.w - 14, bodyY + 14, 4, 0, Math.PI * 2);
+    ctx.stroke();
   }
   if (skin.id === "mop_dj") {
     ctx.strokeStyle = "#164e63";
@@ -2834,6 +2875,16 @@ function drawPlayer() {
     ctx.arc(screenX + 14, bodyY + 6, 5, 0, Math.PI * 2);
     ctx.arc(screenX + player.w - 14, bodyY + 6, 5, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.strokeStyle = "#22d3ee";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(screenX + player.w / 2, bodyY - 2);
+    ctx.lineTo(screenX + player.w / 2 + 12 + swagger, bodyY - 12);
+    ctx.stroke();
+    ctx.fillStyle = "#e0f2fe";
+    for (let i = 0; i < 3; i += 1) {
+      ctx.fillRect(screenX + player.w / 2 + 9 + swagger + i * 2, bodyY - 15 + i * 3, 2, 6);
+    }
   }
   if (skin.id === "cheese_prophet") {
     ctx.fillStyle = "#fde047";
@@ -2842,6 +2893,10 @@ function drawPlayer() {
     ctx.lineTo(screenX + player.w - 10, bodyY + 6);
     ctx.lineTo(screenX + player.w - 14, bodyY + 18);
     ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(253,224,71,0.45)";
+    ctx.beginPath();
+    ctx.arc(screenX + player.w / 2, bodyY - 6, 8 + Math.sin(state.elapsedMs / 120) * 1.4, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -3497,6 +3552,10 @@ updateControlModeUi();
 updateTouchButtonsVisibility();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
+
+
 
 
 
