@@ -69,6 +69,11 @@ const mapGoalHeight = 5000;
 const comboDecayMs = 2200;
 const comboStepSize = 3;
 const comboMaxMultiplier = 6;
+const secretRoomTriggerScore = 500;
+const secretRoomReward = 500;
+const coinDashFirstTriggerScore = 1500;
+const coinDashIntervalScore = 2000;
+const coinDashDurationMs = 8500;
 const phaseCycleMs = 1380;
 const phaseVisibleMs = 880;
 const phaseSpawnGraceMs = 720;
@@ -424,6 +429,22 @@ const state = {
     backgroundOffset: 0,
     jumpQueued: false,
     duckQueued: false
+  },
+  secret: {
+    active: false,
+    used: false,
+    rewardClaimed: false,
+    roomCoins: []
+  },
+  coinDash: {
+    active: false,
+    nextTriggerScore: coinDashFirstTriggerScore,
+    lane: 1,
+    moveCooldownUntil: 0,
+    endAt: 0,
+    pickups: [],
+    nextSpawnAt: 0,
+    collected: 0
   }
 };
 
@@ -456,7 +477,7 @@ function hasSupabaseConfig() {
 }
 
 function repairMojibake(text) {
-  if (typeof text !== "string" || !/[ÃƒÃ‚Ã¢â‚¬]/.test(text)) {
+  if (typeof text !== "string" || !/[ÃƒÆ’Ãƒâ€šÃƒÂ¢Ã¢â€šÂ¬]/.test(text)) {
     return text;
   }
 
@@ -1158,6 +1179,10 @@ function isBananaActive() {
   return state.effects.bananaUntil > state.elapsedMs;
 }
 
+function isAirhornCatastropheActive() {
+  return state.progression.selectedSkill === "airhorn" && isBananaActive();
+}
+
 function activateDisco(duration = discoDurationMs) {
   state.effects.discoUntil = Math.max(state.effects.discoUntil, state.elapsedMs + duration);
   addFloatingText("DISKO!", width / 2, state.cameraY + 220, "#ff4fd8", 70);
@@ -1181,9 +1206,20 @@ function activateBananaSurprise() {
   activateJetpack(-24.5, 1600);
   activateRush(-35, 2600);
   state.progression.bankCoins += 100;
+  for (let i = 0; i < 18; i += 1) {
+    state.collectibles.push({
+      type: "coin",
+      x: rand(24, width - 24),
+      y: state.cameraY + rand(40, height - 180),
+      r: 10,
+      value: i % 4 === 0 ? 2 : 1,
+      collected: false
+    });
+  }
   saveProgression();
   updateProfileBar();
   addFloatingText("TUBAKATASTROFE!", width / 2, state.cameraY + 200, "#ffe066", 105);
+  addFloatingText("OOOMPAA!!", width / 2, state.cameraY + 150, "#ff9f1c", 88);
 }
 
 function scheduleTone(type, frequency, startTime, duration, gainNode, volume) {
@@ -1559,6 +1595,18 @@ function resetGame() {
   resetCombo();
 
   state.runner.nextTriggerScore = runnerIntervalScore;
+  state.secret.active = false;
+  state.secret.used = false;
+  state.secret.rewardClaimed = false;
+  state.secret.roomCoins = [];
+  state.coinDash.active = false;
+  state.coinDash.nextTriggerScore = coinDashFirstTriggerScore;
+  state.coinDash.lane = 1;
+  state.coinDash.moveCooldownUntil = 0;
+  state.coinDash.endAt = 0;
+  state.coinDash.pickups = [];
+  state.coinDash.nextSpawnAt = 0;
+  state.coinDash.collected = 0;
   resetRunnerState();
   resetSkillState();
 
@@ -1586,6 +1634,173 @@ function updateHud() {
   }
   bestEl.textContent = `${Math.floor(state.bestScore)} m`;
   updateProfileBar();
+}
+function isSecretHintWindow() {
+  return !state.secret.used && state.heightScore >= secretRoomTriggerScore - 70 && state.heightScore <= secretRoomTriggerScore + 45;
+}
+
+function getCoinDashLaneX(lane) {
+  return [width * 0.22, width * 0.5, width * 0.78][clamp(lane, 0, 2)] - state.player.w / 2;
+}
+
+function enterSecretRoom() {
+  state.mode = "secret";
+  state.secret.active = true;
+  state.secret.used = true;
+  state.secret.rewardClaimed = false;
+  state.secret.roomCoins = Array.from({ length: 10 }, (_, index) => ({
+    x: 86 + index * 28,
+    y: 112 + (index % 2) * 18,
+    r: index % 3 === 0 ? 11 : 9
+  }));
+  state.player.x = 42;
+  state.player.y = height - 168;
+  state.player.vx = 0;
+  state.player.vy = 0;
+  state.player.bounceSquash = 0.5;
+  updateTouchButtonsVisibility();
+  addFloatingText("HEMMELIG ROM!", width / 2, 120, "#ffe066", 95);
+  addFloatingText("Han fant det!", width / 2, 155, "#9bf6ff", 70);
+}
+
+function exitSecretRoom() {
+  state.mode = "jumper";
+  state.secret.active = false;
+  updateTouchButtonsVisibility();
+  const baseY = state.cameraY + height - 104;
+  rebuildJumperWorld(baseY);
+  state.player.x = width - 94;
+  state.player.y = baseY - state.player.h - 12;
+  state.player.vx = 0;
+  state.player.vy = getJumpVelocity() - 0.5;
+  state.player.bounceSquash = 0.8;
+  addFloatingText("Tilbake igjen!", width / 2, state.cameraY + 190, "#ffe066", 55);
+}
+
+function enterCoinDashMode() {
+  state.mode = "coindash";
+  state.coinDash.active = true;
+  state.coinDash.lane = 1;
+  state.coinDash.moveCooldownUntil = 0;
+  state.coinDash.endAt = state.elapsedMs + coinDashDurationMs;
+  state.coinDash.pickups = [];
+  state.coinDash.nextSpawnAt = state.elapsedMs + 250;
+  state.coinDash.collected = 0;
+  state.player.x = getCoinDashLaneX(state.coinDash.lane);
+  state.player.y = height - 138;
+  state.player.vx = 0;
+  state.player.vy = 0;
+  state.player.bounceSquash = 0.3;
+  updateTouchButtonsVisibility();
+  addFloatingText("COIN DASH!", width / 2, 120, "#ffe066", 90);
+  addFloatingText("Trekk inn mynter, unngå søpla", width / 2, 154, "#9bf6ff", 68);
+}
+
+function exitCoinDashMode() {
+  state.mode = "jumper";
+  state.coinDash.active = false;
+  state.coinDash.pickups = [];
+  updateTouchButtonsVisibility();
+  const baseY = state.cameraY + height - 104;
+  rebuildJumperWorld(baseY);
+  state.player.x = width / 2 - state.player.w / 2;
+  state.player.y = baseY - state.player.h - 12;
+  state.player.vx = 0;
+  state.player.vy = getJumpVelocity() - 0.7;
+  state.player.bounceSquash = 0.75;
+  addFloatingText("COIN DASH FERDIG!", width / 2, state.cameraY + 180, "#ffe066", 70);
+}
+
+function updateSecretRoom() {
+  const player = state.player;
+  const swipeIntent = state.controlMode === "swipe" && state.touch.active ? clamp((state.touch.lastSwipeSpeed || 0) * 5.5, -1, 1) : 0;
+  const moveIntent = Math.abs(swipeIntent) > 0.08 ? swipeIntent : getMoveIntent();
+  const speed = 4.2;
+  player.x += moveIntent * speed;
+  player.x = clamp(player.x, -16, width - player.w + 8);
+  player.y = height - 168;
+  player.vx = moveIntent * speed;
+  player.vy = 0;
+  player.bounceSquash *= 0.8;
+
+  const chest = { x: width / 2 - 46, y: height - 186, w: 92, h: 64 };
+  const touchingChest = player.x + player.w > chest.x && player.x < chest.x + chest.w && player.y + player.h > chest.y && player.y < chest.y + chest.h;
+  if (touchingChest && !state.secret.rewardClaimed) {
+    state.secret.rewardClaimed = true;
+    grantCoins(secretRoomReward, width / 2, 150, "#ffe066", "+" + secretRoomReward + " hemmelige mynter");
+    addFloatingText("JACKPOT!", width / 2, 116, "#ff9f1c", 90);
+  }
+
+  if (state.secret.rewardClaimed && player.x < 18) {
+    exitSecretRoom();
+  }
+}
+
+function updateCoinDashMode() {
+  const moveIntent = getMoveIntent();
+  if (state.elapsedMs >= state.coinDash.moveCooldownUntil) {
+    if (moveIntent < -0.4) {
+      state.coinDash.lane = Math.max(0, state.coinDash.lane - 1);
+      state.coinDash.moveCooldownUntil = state.elapsedMs + 120;
+      state.player.bounceSquash = 0.6;
+    } else if (moveIntent > 0.4) {
+      state.coinDash.lane = Math.min(2, state.coinDash.lane + 1);
+      state.coinDash.moveCooldownUntil = state.elapsedMs + 120;
+      state.player.bounceSquash = 0.6;
+    }
+  }
+
+  state.player.x += (getCoinDashLaneX(state.coinDash.lane) - state.player.x) * 0.32;
+  state.player.y = height - 138;
+  state.player.vx = 0;
+  state.player.vy = 0;
+  state.player.bounceSquash *= 0.82;
+
+  if (state.elapsedMs >= state.coinDash.nextSpawnAt) {
+    const lane = Math.floor(Math.random() * 3);
+    const shiny = Math.random() < 0.22;
+    state.coinDash.pickups.push({
+      lane,
+      x: getCoinDashLaneX(lane) + state.player.w / 2,
+      y: -20,
+      r: shiny ? 12 : 10,
+      type: Math.random() < 0.78 ? "coin" : "junk",
+      value: shiny ? 5 : 3
+    });
+    state.coinDash.nextSpawnAt = state.elapsedMs + rand(240, 420);
+  }
+
+  for (const pickup of state.coinDash.pickups) {
+    pickup.y += pickup.type === "coin" ? 5.6 : 6.3;
+  }
+
+  const playerBox = { x: state.player.x, y: state.player.y, w: state.player.w, h: state.player.h };
+  const remaining = [];
+  for (const pickup of state.coinDash.pickups) {
+    const hit = playerBox.x < pickup.x + pickup.r &&
+      playerBox.x + playerBox.w > pickup.x - pickup.r &&
+      playerBox.y < pickup.y + pickup.r &&
+      playerBox.y + playerBox.h > pickup.y - pickup.r;
+    if (hit) {
+      if (pickup.type === "coin") {
+        state.coinDash.collected += pickup.value;
+        grantCoins(pickup.value, pickup.x, pickup.y, "#ffe066", "+" + pickup.value);
+      } else {
+        state.coins = Math.max(0, state.coins - 2);
+        addFloatingText("BØTTEBONK!", pickup.x, pickup.y, "#ff6b6b", 40);
+        updateHud();
+      }
+      continue;
+    }
+    if (pickup.y < height + 40) {
+      remaining.push(pickup);
+    }
+  }
+  state.coinDash.pickups = remaining;
+
+  if (state.elapsedMs >= state.coinDash.endAt) {
+    exitCoinDashMode();
+  }
 }
 
 function levelUp() {
@@ -1762,6 +1977,9 @@ function updateJumperPlayer() {
 
   if (player.x + player.w < 0) {
     player.x = width;
+  } else if (isSecretHintWindow() && player.x > width + 18) {
+    enterSecretRoom();
+    return;
   } else if (player.x > width) {
     player.x = -player.w;
   }
@@ -1824,6 +2042,12 @@ function updateJumperPlayer() {
     }
     updateHud();
     maybeHandleMapClear();
+  }
+
+  if (state.heightScore >= state.coinDash.nextTriggerScore) {
+    state.coinDash.nextTriggerScore += coinDashIntervalScore;
+    enterCoinDashMode();
+    return;
   }
 
   if (state.heightScore >= state.runner.nextTriggerScore) {
@@ -1984,6 +2208,16 @@ function stepSimulation() {
     return;
   }
 
+  if (state.mode === "secret") {
+    updateSecretRoom();
+    return;
+  }
+
+  if (state.mode === "coindash") {
+    updateCoinDashMode();
+    return;
+  }
+
   updatePlatforms();
   updateJumperPlayer();
   spawnPlatforms();
@@ -1991,6 +2225,45 @@ function stepSimulation() {
 function drawBackground() {
   ctx.clearRect(0, 0, width, height);
   const mapTheme = getSelectedMap().theme;
+
+  if (state.mode === "secret") {
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, "#20103a");
+    gradient.addColorStop(1, "#4a2d72");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    for (let i = 0; i < 8; i += 1) {
+      ctx.fillRect(22 + i * 42, 54 + (i % 2) * 16, 18, 18);
+    }
+    ctx.fillStyle = "#5b3a82";
+    ctx.fillRect(0, height - 110, width, 110);
+    ctx.fillStyle = "#7c59a1";
+    ctx.fillRect(18, 38, width - 36, height - 176);
+    ctx.clearRect(34, 54, width - 68, height - 210);
+    return;
+  }
+
+  if (state.mode === "coindash") {
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, "#091f33");
+    gradient.addColorStop(1, "#16425b");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = "rgba(255,255,255,0.05)";
+    for (let i = 0; i < 3; i += 1) {
+      const laneX = width * (0.22 + i * 0.28);
+      ctx.fillRect(laneX - 36, 0, 72, height);
+      ctx.fillStyle = "rgba(255,255,255,0.12)";
+      for (let y = 0; y < height; y += 34) {
+        ctx.fillRect(laneX - 3, y + (state.elapsedMs / 18 + i * 9) % 34, 6, 18);
+      }
+      ctx.fillStyle = "rgba(255,255,255,0.05)";
+    }
+    ctx.fillStyle = "#0b1c2c";
+    ctx.fillRect(0, height - 100, width, 100);
+    return;
+  }
 
   if (state.mode === "runner") {
     const offset = state.runner.backgroundOffset;
@@ -2062,10 +2335,26 @@ function drawBackground() {
     ctx.arc(cloudX - 22, cloudY + 10, 18, 0, Math.PI * 2);
     ctx.fill();
   }
+
+  if (isSecretHintWindow()) {
+    const hintX = width - 22;
+    const hintY = 122 + Math.sin(state.elapsedMs / 190) * 8;
+    ctx.fillStyle = "rgba(255, 230, 120, 0.16)";
+    ctx.beginPath();
+    ctx.arc(hintX - 6, hintY, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255, 245, 180, 0.35)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(width - 34, hintY - 10);
+    ctx.lineTo(width - 12, hintY);
+    ctx.lineTo(width - 34, hintY + 10);
+    ctx.stroke();
+  }
 }
 
 function drawPlatforms() {
-  if (state.mode === "runner") {
+  if (state.mode !== "jumper") {
     return;
   }
 
@@ -2115,15 +2404,42 @@ function drawPlatforms() {
 }
 
 function drawCollectibles() {
+  if (state.mode === "secret" || state.mode === "coindash") {
+    return;
+  }
   if (state.mode === "runner") {
     for (const obstacle of state.runner.obstacles) {
       const obstacleTop = obstacle.y - obstacle.h;
-      ctx.fillStyle = obstacle.type === "high" ? "#7b2cbf" : "#bc4749";
-      ctx.fillRect(obstacle.x, obstacleTop, obstacle.w, obstacle.h);
-      ctx.fillStyle = obstacle.type === "high" ? "#c77dff" : "#f28482";
-      ctx.fillRect(obstacle.x + 6, obstacleTop + 8, obstacle.w - 12, 8);
-      ctx.fillStyle = "rgba(0,0,0,0.18)";
-      ctx.fillRect(obstacle.x + 4, obstacle.y + 2, obstacle.w - 8, 5);
+      if (isAirhornCatastropheActive()) {
+        if (obstacle.type === "high") {
+          ctx.fillStyle = "#ff7a00";
+          ctx.beginPath();
+          ctx.moveTo(obstacle.x + obstacle.w / 2, obstacleTop);
+          ctx.lineTo(obstacle.x + obstacle.w, obstacle.y);
+          ctx.lineTo(obstacle.x, obstacle.y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = "#fff3bf";
+          ctx.fillRect(obstacle.x + obstacle.w * 0.24, obstacleTop + obstacle.h * 0.35, obstacle.w * 0.52, 8);
+          ctx.fillStyle = "#1f2937";
+          ctx.fillRect(obstacle.x + obstacle.w * 0.28, obstacleTop + obstacle.h * 0.58, obstacle.w * 0.44, 7);
+        } else {
+          ctx.fillStyle = "#d97757";
+          ctx.beginPath();
+          ctx.roundRect(obstacle.x, obstacleTop + 6, obstacle.w, Math.max(18, obstacle.h - 10), 14);
+          ctx.fill();
+          ctx.fillStyle = "#fbbf24";
+          ctx.fillRect(obstacle.x + 4, obstacleTop + 11, obstacle.w - 8, 5);
+          ctx.fillRect(obstacle.x + 4, obstacle.y - 12, obstacle.w - 8, 5);
+        }
+      } else {
+        ctx.fillStyle = obstacle.type === "high" ? "#7b2cbf" : "#bc4749";
+        ctx.fillRect(obstacle.x, obstacleTop, obstacle.w, obstacle.h);
+        ctx.fillStyle = obstacle.type === "high" ? "#c77dff" : "#f28482";
+        ctx.fillRect(obstacle.x + 6, obstacleTop + 8, obstacle.w - 12, 8);
+        ctx.fillStyle = "rgba(0,0,0,0.18)";
+        ctx.fillRect(obstacle.x + 4, obstacle.y + 2, obstacle.w - 8, 5);
+      }
 
       if (obstacle.x > width - 240) {
         const markerY = obstacle.type === "high" ? 98 : 144;
@@ -2158,19 +2474,21 @@ function drawCollectibles() {
 
     if (state.runner.portal) {
       const portal = state.runner.portal;
-      const pulse = 1 + Math.sin(state.elapsedMs / 90) * 0.06;
       ctx.save();
       ctx.translate(portal.x + portal.w / 2, portal.y + portal.h / 2);
-      ctx.scale(pulse, pulse);
-      ctx.strokeStyle = "#00d1ff";
-      ctx.lineWidth = 8;
+      ctx.rotate((state.elapsedMs / 250) % (Math.PI * 2));
+      const gradient = ctx.createRadialGradient(0, 0, 8, 0, 0, portal.w);
+      gradient.addColorStop(0, "rgba(255,255,255,0.9)");
+      gradient.addColorStop(0.4, "rgba(0,209,255,0.75)");
+      gradient.addColorStop(1, "rgba(124,58,237,0.08)");
+      ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.ellipse(0, 0, portal.w / 2, portal.h / 2, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.strokeStyle = "rgba(255,255,255,0.55)";
+      ctx.ellipse(0, 0, portal.w * 0.75, portal.h * 0.52, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.7)";
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.ellipse(0, 0, portal.w / 2 - 8, portal.h / 2 - 8, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, portal.w * 0.55, portal.h * 0.36, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
@@ -2178,73 +2496,59 @@ function drawCollectibles() {
   }
 
   for (const item of state.collectibles) {
+    if (item.collected) {
+      continue;
+    }
+
     const screenY = item.y - state.cameraY;
-    const pulse = 1 + Math.sin((state.elapsedMs / 120) + item.y * 0.02) * 0.08;
+    const pulse = 1 + Math.sin((state.elapsedMs / 130) + item.x * 0.02) * 0.08;
 
     if (item.type === "coin") {
       ctx.fillStyle = isBananaActive() ? "#ffe066" : "#f9b208";
       ctx.beginPath();
       ctx.arc(item.x, screenY, item.r * pulse, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = "#fff3bf";
+      ctx.fillStyle = "#fff0b3";
       ctx.beginPath();
       ctx.arc(item.x - 2, screenY - 2, item.r * 0.45, 0, Math.PI * 2);
       ctx.fill();
       if ((item.value || 1) > 1) {
         ctx.fillStyle = "#7a4d00";
         ctx.font = "bold 12px Trebuchet MS";
-        ctx.fillText("2", item.x - 3, screenY + 4);
+        ctx.fillText(String(item.value), item.x - 3, screenY + 4);
       }
       continue;
     }
 
     if (item.type === "disco") {
-      ctx.save();
-      ctx.translate(item.x, screenY);
-      ctx.rotate(state.elapsedMs / 260);
+      ctx.fillStyle = "#ff4fd8";
+      ctx.beginPath();
+      ctx.arc(item.x, screenY, item.r * pulse, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#fff";
       for (let i = 0; i < 4; i += 1) {
-        ctx.fillStyle = `hsl(${(state.elapsedMs / 6 + i * 90) % 360}, 90%, 65%)`;
-        ctx.fillRect(-4, -14, 8, 28);
-        ctx.rotate(Math.PI / 4);
+        ctx.fillRect(item.x - 6 + i * 4, screenY - 5 + (i % 2) * 3, 2, 2);
       }
-      ctx.restore();
       continue;
     }
 
     if (item.type === "jetpack") {
       ctx.fillStyle = "#ff8c42";
-      ctx.fillRect(item.x - 10, screenY - 12, 20, 24);
-      ctx.fillStyle = "#4f5d75";
-      ctx.fillRect(item.x - 6, screenY - 8, 4, 16);
-      ctx.fillRect(item.x + 2, screenY - 8, 4, 16);
-      ctx.fillStyle = "#ffd166";
-      ctx.beginPath();
-      ctx.moveTo(item.x - 5, screenY + 12);
-      ctx.lineTo(item.x, screenY + 22 + Math.sin(state.elapsedMs / 60) * 3);
-      ctx.lineTo(item.x + 5, screenY + 12);
-      ctx.fill();
+      ctx.fillRect(item.x - 8, screenY - 10, 16, 20);
+      ctx.fillStyle = "#fff0b3";
+      ctx.fillRect(item.x - 5, screenY - 6, 10, 6);
       continue;
     }
+
     if (item.type === "rush") {
       ctx.fillStyle = "#7dd3fc";
-      ctx.fillRect(item.x - 13, screenY - 15, 26, 30);
-      ctx.fillStyle = "#1e3a5f";
-      ctx.fillRect(item.x - 8, screenY - 10, 5, 20);
-      ctx.fillRect(item.x + 3, screenY - 10, 5, 20);
-      ctx.fillStyle = "#dbeafe";
-      ctx.fillRect(item.x - 4, screenY - 18, 8, 8);
-      ctx.fillStyle = "#38bdf8";
       ctx.beginPath();
-      ctx.moveTo(item.x - 8, screenY + 14);
-      ctx.lineTo(item.x - 2, screenY + 30 + Math.sin(state.elapsedMs / 45) * 4);
-      ctx.lineTo(item.x + 1, screenY + 16);
+      ctx.moveTo(item.x, screenY - 12);
+      ctx.lineTo(item.x + 10, screenY + 8);
+      ctx.lineTo(item.x, screenY + 3);
+      ctx.lineTo(item.x - 10, screenY + 8);
+      ctx.closePath();
       ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(item.x + 8, screenY + 14);
-      ctx.lineTo(item.x + 2, screenY + 30 + Math.sin(state.elapsedMs / 45 + 1) * 4);
-      ctx.lineTo(item.x - 1, screenY + 16);
-      ctx.fill();
-      continue;
     }
   }
 }
@@ -2269,14 +2573,15 @@ function drawPlayer() {
   const player = state.player;
   const skin = getSelectedSkin();
   const screenX = player.x;
-  const screenY = state.mode === "runner" ? player.y : player.y - state.cameraY;
+  const screenY = state.mode === "jumper" ? player.y - state.cameraY : player.y;
+  const catastropheScale = isAirhornCatastropheActive() ? 1.32 + Math.sin(state.elapsedMs / 90) * 0.06 : 1;
   const squash = 1 + player.bounceSquash * 0.12;
   const stretch = 1 - player.bounceSquash * 0.08;
-  const bodyW = player.w * squash;
+  const bodyW = player.w * squash * catastropheScale;
   const ducking = state.mode === "runner" && isRunnerDuckActive();
-  const bodyH = player.h * stretch * (ducking ? 0.68 : 1);
+  const bodyH = player.h * stretch * (ducking ? 0.68 : 1) * catastropheScale;
   const bodyX = screenX - (bodyW - player.w) / 2;
-  const bodyY = screenY + (player.h - bodyH) + (ducking ? 8 : 0);
+  const bodyY = screenY + (player.h - bodyH) + (ducking ? 8 : 0) - (catastropheScale - 1) * 10;
   const disco = isDiscoActive();
 
   if ((isJetpackActive() || isRushActive()) && state.mode !== "runner") {
@@ -2349,6 +2654,21 @@ function drawPlayer() {
   ctx.lineTo(screenX + player.w - 8, bodyY + 30);
   ctx.lineTo(screenX + 8, bodyY + 32);
   ctx.fill();
+
+  if (isAirhornCatastropheActive()) {
+    ctx.fillStyle = "rgba(255, 224, 138, 0.92)";
+    ctx.beginPath();
+    ctx.moveTo(screenX + player.w - 4, bodyY + 8);
+    ctx.lineTo(screenX + player.w + 20, bodyY + 2);
+    ctx.lineTo(screenX + player.w + 20, bodyY + 20);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#7c2d12";
+    ctx.fillRect(screenX + player.w - 8, bodyY + 10, 12, 6);
+    ctx.fillStyle = "#ffe066";
+    ctx.font = "bold 16px Trebuchet MS";
+    ctx.fillText("OOMPA", screenX - 8, bodyY - 8);
+  }
 
   if (skin.id === "robot") {
     ctx.fillStyle = "rgba(0, 209, 255, 0.4)";
@@ -2530,6 +2850,79 @@ function drawRushOverlay() {
   }
   ctx.restore();
 }
+function drawSpecialModeUi() {
+  if (state.mode === "secret") {
+    ctx.save();
+    ctx.fillStyle = "#2d1b46";
+    ctx.fillRect(34, height - 150, 54, 74);
+    ctx.fillStyle = "#ffe066";
+    ctx.font = "bold 14px Trebuchet MS";
+    ctx.fillText("UT", 48, height - 108);
+
+    const chestX = width / 2 - 46;
+    const chestY = height - 186;
+    ctx.fillStyle = state.secret.rewardClaimed ? "#8d6f64" : "#c08457";
+    ctx.fillRect(chestX, chestY, 92, 44);
+    ctx.fillStyle = state.secret.rewardClaimed ? "#9ca3af" : "#fbbf24";
+    ctx.fillRect(chestX - 4, chestY - 14, 100, 18);
+    ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    ctx.strokeRect(chestX, chestY, 92, 44);
+
+    for (const coin of state.secret.roomCoins) {
+      ctx.fillStyle = "#ffd166";
+      ctx.beginPath();
+      ctx.arc(coin.x, coin.y, coin.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.fillRect(coin.x - 1, coin.y - coin.r + 2, 2, coin.r - 1);
+    }
+
+    ctx.fillStyle = "rgba(13, 18, 34, 0.72)";
+    ctx.fillRect(16, 16, 310, 92);
+    ctx.fillStyle = "#ffe066";
+    ctx.font = "bold 22px Trebuchet MS";
+    ctx.fillText("Hemmelig rom", 30, 42);
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = "16px Trebuchet MS";
+    ctx.fillText(state.secret.rewardClaimed ? "G\u00e5 til venstre d\u00f8r for \u00e5 komme tilbake" : "Snus borti kista for 500 mynter", 30, 68);
+    ctx.fillStyle = "rgba(255,255,255,0.72)";
+    ctx.fillText("Hintet var gl\u00f8den til h\u00f8yre ved 500 m", 30, 92);
+    ctx.restore();
+    return;
+  }
+
+  if (state.mode === "coindash") {
+    ctx.save();
+    for (const pickup of state.coinDash.pickups) {
+      if (pickup.type === "coin") {
+        ctx.fillStyle = pickup.value >= 5 ? "#fff0a6" : "#ffd166";
+        ctx.beginPath();
+        ctx.arc(pickup.x, pickup.y, pickup.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.38)";
+        ctx.fillRect(pickup.x - 1, pickup.y - pickup.r + 2, 2, pickup.r - 1);
+      } else {
+        ctx.fillStyle = "#9ca3af";
+        ctx.fillRect(pickup.x - pickup.r, pickup.y - pickup.r, pickup.r * 2, pickup.r * 2);
+        ctx.fillStyle = "#475569";
+        ctx.fillRect(pickup.x - pickup.r + 3, pickup.y - 2, pickup.r * 2 - 6, 4);
+      }
+    }
+
+    ctx.fillStyle = "rgba(13, 18, 34, 0.72)";
+    ctx.fillRect(16, 16, 320, 98);
+    ctx.fillStyle = "#ffe066";
+    ctx.font = "bold 22px Trebuchet MS";
+    ctx.fillText("Coin Dash", 30, 42);
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = "16px Trebuchet MS";
+    ctx.fillText("Tid igjen: " + Math.max(0, Math.ceil((state.coinDash.endAt - state.elapsedMs) / 1000)) + "s", 30, 68);
+    ctx.fillText("Bonusmynter: " + state.coinDash.collected, 30, 90);
+    ctx.fillStyle = "rgba(255,255,255,0.72)";
+    ctx.fillText("Venstre/h\u00f8yre flytter deg mellom banene", 30, 112);
+    ctx.restore();
+  }
+}
 function drawFrame() {
   drawBackground();
   drawPlatforms();
@@ -2537,6 +2930,7 @@ function drawFrame() {
   drawPlayer();
   drawFloatingTexts();
   drawRunnerUi();
+  drawSpecialModeUi();
   drawStatusEffects();
   drawRushOverlay();
 }
@@ -2746,6 +3140,12 @@ canvas.addEventListener("pointerdown", (event) => {
     return;
   }
 
+  if (state.mode === "coindash") {
+    state.coinDash.lane = point.x < width / 3 ? 0 : point.x > width * (2 / 3) ? 2 : 1;
+    state.player.bounceSquash = 0.6;
+    return;
+  }
+
   if (state.controlMode === "buttons") {
     return;
   }
@@ -2765,7 +3165,7 @@ canvas.addEventListener("pointerdown", (event) => {
 });
 
 canvas.addEventListener("pointermove", (event) => {
-  if (!state.touch.active || state.touch.pointerId !== event.pointerId || state.mode !== "jumper") {
+  if (!state.touch.active || state.touch.pointerId !== event.pointerId || !(state.mode === "jumper" || state.mode === "secret")) {
     return;
   }
   const point = getCanvasPoint(event);
@@ -2813,7 +3213,7 @@ function bindTouchPad(button, direction) {
       }
       return;
     }
-    if (state.mode !== "jumper") {
+    if (!(state.mode === "jumper" || state.mode === "secret" || state.mode === "coindash")) {
       return;
     }
     setKeyboardInput(direction, true);
@@ -2877,7 +3277,7 @@ function updateTouchButtonsVisibility() {
   }
 
   updateTouchButtonLabels();
-  const isPlayableMode = state.mode === "jumper" || state.mode === "runner";
+  const isPlayableMode = state.mode === "jumper" || state.mode === "runner" || state.mode === "secret" || state.mode === "coindash";
   const shouldShow = isCoarsePointer && state.running && isPlayableMode && state.controlMode === "buttons" && overlayEl.classList.contains("hidden") && (settingsPanelEl?.classList.contains("hidden") ?? true);
   if (shouldShow) {
     positionTouchButtons();
@@ -2980,5 +3380,9 @@ updateControlModeUi();
 updateTouchButtonsVisibility();
 fetchLeaderboard();
 requestAnimationFrame(loop);
+
+
+
+
 
 
