@@ -77,6 +77,7 @@ const coinDashDurationMs = 8500;
 const phaseCycleMs = 1380;
 const phaseVisibleMs = 880;
 const phaseSpawnGraceMs = 720;
+const fireworksDurationMs = 2800;
 const supabaseConfig = window.SUPABASE_CONFIG || { url: "", publishableKey: "", table: "scores" };
 const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
 const lowFxMode = isCoarsePointer;
@@ -389,7 +390,8 @@ const state = {
     discoUntil: 0,
     jetpackUntil: 0,
     bananaUntil: 0,
-    rushUntil: 0
+    rushUntil: 0,
+    fireworksUntil: 0
   },
   skillState: {
     selected: "none",
@@ -444,7 +446,16 @@ const state = {
     endAt: 0,
     pickups: [],
     nextSpawnAt: 0,
-    collected: 0
+    collected: 0,
+    laneFlashUntil: 0,
+    celebrationUntil: 0
+  },
+  spectacle: {
+    reserveLife: false,
+    nextEnemyAt: 560,
+    enemy: null,
+    projectiles: [],
+    hitCooldownUntil: 0
   }
 };
 
@@ -1183,6 +1194,10 @@ function isAirhornCatastropheActive() {
   return state.progression.selectedSkill === "airhorn" && isBananaActive();
 }
 
+function isFireworksActive() {
+  return state.effects.fireworksUntil > state.elapsedMs;
+}
+
 function activateDisco(duration = discoDurationMs) {
   state.effects.discoUntil = Math.max(state.effects.discoUntil, state.elapsedMs + duration);
   addFloatingText("DISKO!", width / 2, state.cameraY + 220, "#ff4fd8", 70);
@@ -1197,6 +1212,12 @@ function activateRush(power = -28, duration = rushDurationMs) {
   state.effects.rushUntil = Math.max(state.effects.rushUntil, state.elapsedMs + duration);
   state.player.vy = Math.min(state.player.vy, power);
   addFloatingText("SUPERJETPACK!", state.player.x + state.player.w / 2, state.player.y - 18, "#7dd3fc", 60);
+}
+function activateFireworks(duration = fireworksDurationMs) {
+  state.effects.fireworksUntil = Math.max(state.effects.fireworksUntil, state.elapsedMs + duration);
+  activateDisco(Math.min(2200, duration));
+  grantCoins(6, state.player.x + state.player.w / 2, state.player.y - 16, "#fff0a6", "+6 WOW!");
+  addFloatingText("FYRVERKERI!", width / 2, state.cameraY + 200, "#fff0a6", 66);
 }
 function activateBananaSurprise() {
   state.skillState.bananaTriggered = true;
@@ -1368,7 +1389,11 @@ function maybeCreateCollectible(platform) {
   const powerupChance = 0.06 + difficulty * 0.08 + rules.collectibleBonus + (isBananaActive() ? 0.14 : 0);
   if (Math.random() < powerupChance) {
     const roll = Math.random();
-    const type = roll < 0.34 ? "disco" : roll < 0.7 ? "jetpack" : "rush";
+    const heartAllowed = !state.spectacle.reserveLife && !state.skillState.extraLifeUsed;
+    const type = roll < 0.28 ? "disco" :
+      roll < 0.54 ? "jetpack" :
+      roll < 0.76 ? "rush" :
+      roll < 0.92 || !heartAllowed ? "firework" : "heart";
     state.collectibles.push({
       type,
       x: platform.x + platform.w / 2 + rand(-18, 18),
@@ -1418,6 +1443,78 @@ function createRunnerPickup(x, y, value = 1) {
   return { x, y, r: 8, value, collected: false };
 }
 
+function spawnEnemyHarasser() {
+  const side = Math.random() < 0.5 ? -1 : 1;
+  state.spectacle.enemy = {
+    side,
+    x: side < 0 ? 34 : width - 34,
+    targetX: side < 0 ? width * 0.28 : width * 0.72,
+    y: state.cameraY + 96,
+    wobble: rand(0, Math.PI * 2),
+    throwAt: state.elapsedMs + 520,
+    throwsLeft: 3,
+    exitAt: state.elapsedMs + 3000
+  };
+  addFloatingText("FIENDE!", width / 2, state.cameraY + 132, "#fecdd3", 44);
+}
+
+function updateJumperSpectacle() {
+  if (state.heightScore >= state.spectacle.nextEnemyAt && !state.spectacle.enemy) {
+    state.spectacle.nextEnemyAt += rand(520, 860);
+    spawnEnemyHarasser();
+  }
+
+  const enemy = state.spectacle.enemy;
+  if (enemy) {
+    enemy.y = state.cameraY + 96 + Math.sin(state.elapsedMs / 150 + enemy.wobble) * 8;
+    enemy.x += (enemy.targetX - enemy.x) * 0.08;
+    if (state.elapsedMs >= enemy.throwAt && enemy.throwsLeft > 0) {
+      const playerCenterX = state.player.x + state.player.w / 2;
+      const dx = playerCenterX - enemy.x;
+      state.spectacle.projectiles.push({
+        x: enemy.x,
+        y: enemy.y + 12,
+        vx: clamp(dx / 75, -3.4, 3.4),
+        vy: 2.6 + Math.random() * 0.9,
+        r: 9 + Math.random() * 2
+      });
+      enemy.throwAt = state.elapsedMs + rand(360, 620);
+      enemy.throwsLeft -= 1;
+    }
+
+    if (enemy.throwsLeft <= 0 && state.elapsedMs > enemy.exitAt) {
+      state.spectacle.enemy = null;
+    }
+  }
+
+  const player = state.player;
+  const remainingProjectiles = [];
+  for (const projectile of state.spectacle.projectiles) {
+    projectile.x += projectile.vx;
+    projectile.y += projectile.vy;
+    projectile.vy += 0.18;
+
+    const dx = (player.x + player.w / 2) - projectile.x;
+    const dy = (player.y + player.h / 2) - projectile.y;
+    const hitRadius = 20 + projectile.r;
+    if (state.elapsedMs > state.spectacle.hitCooldownUntil && (dx * dx) + (dy * dy) < hitRadius * hitRadius) {
+      state.spectacle.hitCooldownUntil = state.elapsedMs + 850;
+      state.coins = Math.max(0, state.coins - 2);
+      player.vx += projectile.vx * 0.35;
+      player.vy = Math.min(player.vy, -4.6);
+      player.bounceSquash = 0.92;
+      addFloatingText("SPLÆSJ!", projectile.x, projectile.y, "#fecdd3", 40);
+      updateHud();
+      continue;
+    }
+
+    if (projectile.y < state.cameraY + height + 80) {
+      remainingProjectiles.push(projectile);
+    }
+  }
+  state.spectacle.projectiles = remainingProjectiles;
+}
+
 function spawnRunnerPickupBurst() {
   const variant = state.runner.variant;
   const lane = Math.random() < 0.55 ? "jump" : "ground";
@@ -1434,7 +1531,7 @@ function spawnRunnerPickupBurst() {
 function createObstacle() {
   const variant = state.runner.variant;
   const lowBias = state.runner.lowBias || 0.55;
-  const spawnX = width + rand(220, 340);
+  const spawnX = width + rand(300, 430);
   const type = Math.random() < lowBias ? "low" : "high";
   if (type === "low") {
     return {
@@ -1460,7 +1557,7 @@ function resetRunnerState() {
   const rules = getMapRules();
   const variantConfig = getRunnerVariantConfig();
   state.runner.distance = 0;
-  state.runner.nextObstacleAt = variantConfig.id === "sprint" ? 780 : 920;
+  state.runner.nextObstacleAt = variantConfig.id === "sprint" ? 900 : 1040;
   state.runner.portalDistance = 3200 + (stage - 1) * 320 + rules.runnerPortalShift + variantConfig.portalShift;
   state.runner.variant = variantConfig.id;
   state.runner.variantLabel = variantConfig.label;
@@ -1474,10 +1571,27 @@ function resetRunnerState() {
   state.runner.portal = null;
   state.runner.duckUntil = 0;
   state.runner.obstacleCooldownUntil = 0;
-  state.runner.speed = 4.2 + state.level * 0.14 + stage * 0.24 + rules.runnerSpeedBonus * 0.55 + variantConfig.speedBonus;
+  state.runner.speed = 3.8 + state.level * 0.12 + stage * 0.2 + rules.runnerSpeedBonus * 0.45 + variantConfig.speedBonus;
   state.runner.backgroundOffset = 0;
   state.runner.jumpQueued = false;
   state.runner.duckQueued = false;
+}
+
+function getNextRunnerObstacle() {
+  if (state.mode !== "runner") {
+    return null;
+  }
+
+  let nearest = null;
+  for (const obstacle of state.runner.obstacles) {
+    if (obstacle.x + obstacle.w < runnerPlayerX - 12) {
+      continue;
+    }
+    if (!nearest || obstacle.x < nearest.x) {
+      nearest = obstacle;
+    }
+  }
+  return nearest;
 }
 
 function enterRunnerMode() {
@@ -1588,6 +1702,7 @@ function resetGame() {
   state.effects.jetpackUntil = 0;
   state.effects.bananaUntil = 0;
   state.effects.rushUntil = 0;
+  state.effects.fireworksUntil = 0;
   state.floatingTexts = [];
   state.runner.triggered = false;
   state.runner.completed = false;
@@ -1607,6 +1722,13 @@ function resetGame() {
   state.coinDash.pickups = [];
   state.coinDash.nextSpawnAt = 0;
   state.coinDash.collected = 0;
+  state.coinDash.laneFlashUntil = 0;
+  state.coinDash.celebrationUntil = 0;
+  state.spectacle.reserveLife = false;
+  state.spectacle.nextEnemyAt = 560;
+  state.spectacle.enemy = null;
+  state.spectacle.projectiles = [];
+  state.spectacle.hitCooldownUntil = 0;
   resetRunnerState();
   resetSkillState();
 
@@ -1641,6 +1763,17 @@ function isSecretHintWindow() {
 
 function getCoinDashLaneX(lane) {
   return [width * 0.22, width * 0.5, width * 0.78][clamp(lane, 0, 2)] - state.player.w / 2;
+}
+
+function spawnCoinDashPickup(lane, type = "coin", shiny = false, y = -20) {
+  state.coinDash.pickups.push({
+    lane,
+    x: getCoinDashLaneX(lane) + state.player.w / 2,
+    y,
+    r: shiny ? 12 : 10,
+    type,
+    value: type === "coin" ? (shiny ? 5 : 3) : 0
+  });
 }
 
 function enterSecretRoom() {
@@ -1686,6 +1819,8 @@ function enterCoinDashMode() {
   state.coinDash.pickups = [];
   state.coinDash.nextSpawnAt = state.elapsedMs + 250;
   state.coinDash.collected = 0;
+  state.coinDash.laneFlashUntil = state.elapsedMs + 500;
+  state.coinDash.celebrationUntil = 0;
   state.player.x = getCoinDashLaneX(state.coinDash.lane);
   state.player.y = height - 138;
   state.player.vx = 0;
@@ -1694,6 +1829,7 @@ function enterCoinDashMode() {
   updateTouchButtonsVisibility();
   addFloatingText("COIN DASH!", width / 2, 120, "#ffe066", 90);
   addFloatingText("Trekk inn mynter, unngå søpla", width / 2, 154, "#9bf6ff", 68);
+  addFloatingText(`${getSelectedSkin().name} er klar!`, width / 2, 188, "#ffffff", 56);
 }
 
 function exitCoinDashMode() {
@@ -1742,11 +1878,13 @@ function updateCoinDashMode() {
     if (moveIntent < -0.4) {
       state.coinDash.lane = Math.max(0, state.coinDash.lane - 1);
       state.coinDash.moveCooldownUntil = state.elapsedMs + 120;
-      state.player.bounceSquash = 0.6;
+      state.coinDash.laneFlashUntil = state.elapsedMs + 180;
+      state.player.bounceSquash = 0.75;
     } else if (moveIntent > 0.4) {
       state.coinDash.lane = Math.min(2, state.coinDash.lane + 1);
       state.coinDash.moveCooldownUntil = state.elapsedMs + 120;
-      state.player.bounceSquash = 0.6;
+      state.coinDash.laneFlashUntil = state.elapsedMs + 180;
+      state.player.bounceSquash = 0.75;
     }
   }
 
@@ -1757,17 +1895,25 @@ function updateCoinDashMode() {
   state.player.bounceSquash *= 0.82;
 
   if (state.elapsedMs >= state.coinDash.nextSpawnAt) {
-    const lane = Math.floor(Math.random() * 3);
-    const shiny = Math.random() < 0.22;
-    state.coinDash.pickups.push({
-      lane,
-      x: getCoinDashLaneX(lane) + state.player.w / 2,
-      y: -20,
-      r: shiny ? 12 : 10,
-      type: Math.random() < 0.78 ? "coin" : "junk",
-      value: shiny ? 5 : 3
-    });
-    state.coinDash.nextSpawnAt = state.elapsedMs + rand(240, 420);
+    const patternRoll = Math.random();
+    if (patternRoll < 0.16) {
+      const shinyLane = Math.floor(Math.random() * 3);
+      for (let lane = 0; lane < 3; lane += 1) {
+        spawnCoinDashPickup(lane, "coin", lane === shinyLane);
+      }
+      state.coinDash.nextSpawnAt = state.elapsedMs + rand(360, 520);
+    } else if (patternRoll < 0.34) {
+      const firstLane = Math.floor(Math.random() * 3);
+      const secondLane = (firstLane + 1 + Math.floor(Math.random() * 2)) % 3;
+      spawnCoinDashPickup(firstLane, "coin", Math.random() < 0.24);
+      spawnCoinDashPickup(secondLane, "coin", Math.random() < 0.24);
+      state.coinDash.nextSpawnAt = state.elapsedMs + rand(280, 420);
+    } else {
+      const lane = Math.floor(Math.random() * 3);
+      const shiny = Math.random() < 0.22;
+      spawnCoinDashPickup(lane, Math.random() < 0.78 ? "coin" : "junk", shiny);
+      state.coinDash.nextSpawnAt = state.elapsedMs + rand(240, 420);
+    }
   }
 
   for (const pickup of state.coinDash.pickups) {
@@ -1784,9 +1930,15 @@ function updateCoinDashMode() {
     if (hit) {
       if (pickup.type === "coin") {
         state.coinDash.collected += pickup.value;
+        state.coinDash.celebrationUntil = state.elapsedMs + (pickup.value >= 5 ? 360 : 180);
+        state.player.bounceSquash = pickup.value >= 5 ? 1 : 0.72;
+        if (pickup.value >= 5) {
+          addFloatingText("MEGA!", pickup.x, pickup.y - 12, "#fff0a6", 42);
+        }
         grantCoins(pickup.value, pickup.x, pickup.y, "#ffe066", "+" + pickup.value);
       } else {
         state.coins = Math.max(0, state.coins - 2);
+        state.coinDash.laneFlashUntil = state.elapsedMs + 220;
         addFloatingText("BØTTEBONK!", pickup.x, pickup.y, "#ff6b6b", 40);
         updateHud();
       }
@@ -1887,6 +2039,17 @@ function collectPickups() {
         extendCombo(1, item.x, item.y, "SUPERJETPACK!");
         activateRush(isBananaActive() ? -31 : -28, isBananaActive() ? 2200 : rushDurationMs);
       }
+
+      if (item.type === "firework") {
+        extendCombo(2, item.x, item.y, "WOW!");
+        activateFireworks();
+      }
+
+      if (item.type === "heart") {
+        state.spectacle.reserveLife = true;
+        extendCombo(2, item.x, item.y, "EKSTRALIV!");
+        addFloatingText("EKSTRALIV LAGRET!", item.x, item.y - 18, "#7cff95", 56);
+      }
     }
   }
 }
@@ -1910,6 +2073,22 @@ function getMoveIntent() {
 }
 
 function reviveFromFall() {
+  if (state.spectacle.reserveLife) {
+    state.spectacle.reserveLife = false;
+    const rescuePlatformY = state.cameraY + height - 160;
+    const rescuePlatform = createPlatform(rescuePlatformY, true, null);
+    rescuePlatform.cracked = false;
+    rescuePlatform.vx = 0;
+    state.platforms.push(rescuePlatform);
+    state.player.x = width / 2 - state.player.w / 2;
+    state.player.y = rescuePlatformY - state.player.h - 10;
+    state.player.vx = 0;
+    state.player.vy = getJumpVelocity() - 1;
+    state.player.bounceSquash = 1;
+    addFloatingText("EKSTRALIV REDDER DEG!", width / 2, state.cameraY + 220, "#7cff95", 74);
+    return true;
+  }
+
   if (state.progression.selectedSkill !== "extra_life" || state.skillState.extraLifeUsed) {
     return false;
   }
@@ -1969,6 +2148,8 @@ function updateJumperPlayer() {
     state.skillState.dramaNextAt += rand(380, 860);
     addFloatingText(dramaLines[Math.floor(Math.random() * dramaLines.length)], width / 2, state.cameraY + 240, "#ffffff", 40);
   }
+
+  updateJumperSpectacle();
 
   player.vy += getGravity(player.vy);
   player.vx = clamp(player.vx, -touchSpeedCap, touchSpeedCap);
@@ -2068,7 +2249,7 @@ function updateRunnerPlayer() {
   const player = state.player;
   const runner = state.runner;
   const duckActive = isRunnerDuckActive();
-  const speed = runner.speed + Math.min(1.4, state.level * 0.12) + Math.min(0.9, (runner.stage - 1) * 0.11);
+  const speed = runner.speed + Math.min(1.0, state.level * 0.1) + Math.min(0.7, (runner.stage - 1) * 0.09);
 
   runner.distance += speed;
   runner.backgroundOffset += speed;
@@ -2107,8 +2288,8 @@ function updateRunnerPlayer() {
 
   if (!runner.portal && runner.distance >= runner.nextObstacleAt) {
     runner.obstacles.push(createObstacle());
-    const baseSpacing = runner.variant === "sprint" ? 460 : 540 - Math.min(100, runner.stage * 10);
-    runner.nextObstacleAt += rand(Math.max(360, baseSpacing), Math.max(520, baseSpacing + 150));
+    const baseSpacing = runner.variant === "sprint" ? 540 : 650 - Math.min(90, runner.stage * 8);
+    runner.nextObstacleAt += rand(Math.max(430, baseSpacing), Math.max(620, baseSpacing + 160));
   }
 
   if (!runner.portal && runner.distance >= runner.nextPickupAt) {
@@ -2273,20 +2454,22 @@ function drawBackground() {
   }
 
   if (state.mode === "coindash") {
+    const activeLane = state.coinDash.lane;
+    const lanePulse = state.elapsedMs < state.coinDash.laneFlashUntil ? 0.34 : 0.14;
+    const celebrate = state.elapsedMs < state.coinDash.celebrationUntil;
     const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, "#091f33");
-    gradient.addColorStop(1, "#16425b");
+    gradient.addColorStop(0, celebrate ? "#173b5f" : "#091f33");
+    gradient.addColorStop(1, celebrate ? "#1e5f79" : "#16425b");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
-    ctx.fillStyle = "rgba(255,255,255,0.05)";
     for (let i = 0; i < 3; i += 1) {
       const laneX = width * (0.22 + i * 0.28);
-      ctx.fillRect(laneX - 36, 0, 72, height);
-      ctx.fillStyle = "rgba(255,255,255,0.12)";
+      ctx.fillStyle = i === activeLane ? `rgba(125, 211, 252, ${lanePulse})` : "rgba(255,255,255,0.05)";
+      ctx.fillRect(laneX - 40, 0, 80, height);
+      ctx.fillStyle = i === activeLane ? "rgba(219, 234, 254, 0.22)" : "rgba(255,255,255,0.12)";
       for (let y = 0; y < height; y += 34) {
         ctx.fillRect(laneX - 3, y + (state.elapsedMs / 18 + i * 9) % 34, 6, 18);
       }
-      ctx.fillStyle = "rgba(255,255,255,0.05)";
     }
     ctx.fillStyle = "#0b1c2c";
     ctx.fillRect(0, height - 100, width, 100);
@@ -2350,6 +2533,22 @@ function drawBackground() {
       ctx.lineTo((i / 7) * width, 0);
       ctx.lineTo(((i + 1) / 7) * width, 0);
       ctx.fill();
+    }
+  }
+
+  if (isFireworksActive()) {
+    for (let i = 0; i < (lowFxMode ? 5 : 9); i += 1) {
+      const burstX = (width * (0.12 + i * 0.1) + Math.sin(state.elapsedMs / 220 + i) * 22);
+      const burstY = 72 + (i % 3) * 58 + Math.cos(state.elapsedMs / 260 + i) * 12;
+      for (let j = 0; j < 6; j += 1) {
+        const angle = (Math.PI * 2 * j) / 6 + state.elapsedMs / 380;
+        ctx.strokeStyle = `hsla(${(state.elapsedMs / 7 + i * 28 + j * 18) % 360}, 95%, 72%, 0.34)`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(burstX, burstY);
+        ctx.lineTo(burstX + Math.cos(angle) * 16, burstY + Math.sin(angle) * 16);
+        ctx.stroke();
+      }
     }
   }
 
@@ -2464,25 +2663,48 @@ function drawCollectibles() {
           ctx.fillRect(obstacle.x + 4, obstacle.y - 12, obstacle.w - 8, 5);
         }
       } else {
-        ctx.fillStyle = obstacle.type === "high" ? "#7b2cbf" : "#bc4749";
-        ctx.fillRect(obstacle.x, obstacleTop, obstacle.w, obstacle.h);
-        ctx.fillStyle = obstacle.type === "high" ? "#c77dff" : "#f28482";
-        ctx.fillRect(obstacle.x + 6, obstacleTop + 8, obstacle.w - 12, 8);
-        ctx.fillStyle = "rgba(0,0,0,0.18)";
-        ctx.fillRect(obstacle.x + 4, obstacle.y + 2, obstacle.w - 8, 5);
+        if (obstacle.type === "high") {
+          ctx.strokeStyle = "rgba(199,125,255,0.45)";
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(obstacle.x + obstacle.w * 0.24, obstacleTop - 22);
+          ctx.lineTo(obstacle.x + obstacle.w * 0.24, obstacleTop);
+          ctx.moveTo(obstacle.x + obstacle.w * 0.76, obstacleTop - 22);
+          ctx.lineTo(obstacle.x + obstacle.w * 0.76, obstacleTop);
+          ctx.stroke();
+          ctx.fillStyle = "#7b2cbf";
+          ctx.fillRect(obstacle.x, obstacleTop, obstacle.w, obstacle.h);
+          ctx.fillStyle = "#c77dff";
+          ctx.fillRect(obstacle.x + 6, obstacleTop + 8, obstacle.w - 12, 8);
+          ctx.fillStyle = "rgba(255,255,255,0.18)";
+          ctx.fillRect(obstacle.x + 8, obstacleTop + obstacle.h * 0.32, obstacle.w - 16, 6);
+        } else {
+          ctx.fillStyle = "#bc4749";
+          ctx.beginPath();
+          ctx.roundRect(obstacle.x, obstacleTop + 6, obstacle.w, Math.max(20, obstacle.h - 10), 14);
+          ctx.fill();
+          ctx.fillStyle = "#f28482";
+          ctx.fillRect(obstacle.x + 4, obstacleTop + 12, obstacle.w - 8, 6);
+          ctx.fillRect(obstacle.x + 4, obstacle.y - 13, obstacle.w - 8, 6);
+          ctx.fillStyle = "rgba(0,0,0,0.18)";
+          ctx.fillRect(obstacle.x + 6, obstacle.y + 2, obstacle.w - 12, 5);
+        }
       }
 
-      if (obstacle.x > width - 240) {
-        const markerY = obstacle.type === "high" ? 98 : 144;
-        ctx.fillStyle = obstacle.type === "high" ? "#c77dff" : "#ff6b6b";
+      if (obstacle.x > width - 300) {
+        const markerY = obstacle.type === "high" ? 96 : 146;
+        const markerColor = obstacle.type === "high" ? "#c77dff" : "#ff6b6b";
+        ctx.fillStyle = "rgba(15, 23, 42, 0.7)";
+        ctx.fillRect(width - 126, markerY - 18, 108, 36);
+        ctx.fillStyle = markerColor;
         ctx.beginPath();
-        ctx.moveTo(width - 18, markerY);
-        ctx.lineTo(width - 42, markerY - 10);
-        ctx.lineTo(width - 42, markerY + 10);
+        ctx.moveTo(width - 22, markerY);
+        ctx.lineTo(width - 48, markerY - 11);
+        ctx.lineTo(width - 48, markerY + 11);
         ctx.closePath();
         ctx.fill();
-        ctx.font = "bold 14px Trebuchet MS";
-        ctx.fillText(obstacle.type === "high" ? "DUKK" : "HOPP", width - 92, markerY + 5);
+        ctx.font = "bold 15px Trebuchet MS";
+        ctx.fillText(obstacle.type === "high" ? "DUKK" : "HOPP", width - 114, markerY + 5);
       }
     }
 
@@ -2621,6 +2843,70 @@ function drawCollectibles() {
       ctx.lineTo(item.x + 2, screenY + 30 + Math.sin(state.elapsedMs / 45 + 1) * 4);
       ctx.lineTo(item.x - 1, screenY + 16);
       ctx.fill();
+      continue;
+    }
+
+    if (item.type === "firework") {
+      ctx.save();
+      ctx.translate(item.x, screenY);
+      ctx.rotate(state.elapsedMs / 280);
+      for (let i = 0; i < 4; i += 1) {
+        ctx.fillStyle = `hsl(${(state.elapsedMs / 7 + i * 70) % 360}, 90%, 66%)`;
+        ctx.fillRect(-3, -14, 6, 28);
+        ctx.rotate(Math.PI / 4);
+      }
+      ctx.fillStyle = "#fff3bf";
+      ctx.beginPath();
+      ctx.arc(0, 0, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      continue;
+    }
+
+    if (item.type === "heart") {
+      ctx.fillStyle = "#7cff95";
+      ctx.beginPath();
+      ctx.arc(item.x - 5, screenY - 2, 6, 0, Math.PI * 2);
+      ctx.arc(item.x + 5, screenY - 2, 6, 0, Math.PI * 2);
+      ctx.lineTo(item.x, screenY + 12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.fillRect(item.x - 2, screenY - 2, 4, 9);
+      ctx.fillRect(item.x - 5, screenY + 1, 10, 4);
+    }
+  }
+
+  if (state.mode === "jumper") {
+    const enemy = state.spectacle.enemy;
+    if (enemy) {
+      const enemyScreenY = enemy.y - state.cameraY;
+      ctx.save();
+      ctx.translate(enemy.x, enemyScreenY);
+      ctx.fillStyle = "#334155";
+      ctx.beginPath();
+      ctx.arc(0, 0, 15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#f8fafc";
+      ctx.beginPath();
+      ctx.arc(-6, -2, 4, 0, Math.PI * 2);
+      ctx.arc(6, -2, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ef4444";
+      ctx.fillRect(-10, 10, 20, 7);
+      ctx.fillStyle = "#94a3b8";
+      ctx.fillRect(enemy.side < 0 ? 8 : -14, -6, 10, 12);
+      ctx.restore();
+    }
+
+    for (const projectile of state.spectacle.projectiles) {
+      const projectileScreenY = projectile.y - state.cameraY;
+      ctx.fillStyle = "#f87171";
+      ctx.beginPath();
+      ctx.arc(projectile.x, projectileScreenY, projectile.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.fillRect(projectile.x - 2, projectileScreenY - projectile.r + 2, 4, 5);
     }
   }
 }
@@ -2650,13 +2936,35 @@ function drawPlayer() {
   const squash = 1 + player.bounceSquash * 0.12;
   const stretch = 1 - player.bounceSquash * 0.08;
   const ducking = state.mode === "runner" && isRunnerDuckActive();
+  const coinDashHeroScale = state.mode === "coindash" ? 1.12 : 1;
   const idleBob = ducking ? 0 : Math.sin(state.elapsedMs / 140) * 1.8;
   const swagger = Math.sin(state.elapsedMs / 180) * 2.5;
-  const bodyW = player.w * squash * catastropheScale;
-  const bodyH = player.h * stretch * (ducking ? 0.68 : 1) * catastropheScale;
+  const bodyW = player.w * squash * catastropheScale * coinDashHeroScale;
+  const bodyH = player.h * stretch * (ducking ? 0.68 : 1) * catastropheScale * coinDashHeroScale;
   const bodyX = screenX - (bodyW - player.w) / 2;
   const bodyY = screenY + (player.h - bodyH) + (ducking ? 8 : 0) - (catastropheScale - 1) * 10 + idleBob;
   const disco = isDiscoActive();
+
+  if (skin.cost > 0 && state.mode !== "runner") {
+    const aura = ctx.createRadialGradient(screenX + player.w / 2, screenY + player.h / 2, 8, screenX + player.w / 2, screenY + player.h / 2, skin.cost >= 200 ? 52 : 40);
+    aura.addColorStop(0, "rgba(255,255,255,0.08)");
+    aura.addColorStop(0.45, `${skin.colors.visor}22`);
+    aura.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(screenX + player.w / 2, screenY + player.h / 2, skin.cost >= 200 ? 50 : 38, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (!lowFxMode) {
+      for (let i = 0; i < (skin.cost >= 200 ? 3 : 2); i += 1) {
+        const sparkleX = screenX + 8 + i * 14 + Math.sin(state.elapsedMs / 160 + i) * 5;
+        const sparkleY = screenY + 6 + i * 11 + Math.cos(state.elapsedMs / 180 + i) * 4;
+        ctx.fillStyle = skin.colors.visor;
+        ctx.fillRect(sparkleX - 1, sparkleY - 4, 2, 8);
+        ctx.fillRect(sparkleX - 4, sparkleY - 1, 8, 2);
+      }
+    }
+  }
 
   if ((isJetpackActive() || isRushActive()) && state.mode !== "runner") {
     const flameScale = isRushActive() ? 1.55 : 1;
@@ -2680,7 +2988,7 @@ function drawPlayer() {
   }
 
   const bodyGlow = ctx.createRadialGradient(bodyX + bodyW / 2, bodyY + bodyH / 2, 10, bodyX + bodyW / 2, bodyY + bodyH / 2, Math.max(bodyW, bodyH));
-  bodyGlow.addColorStop(0, disco ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.08)");
+  bodyGlow.addColorStop(0, disco ? "rgba(255,255,255,0.16)" : state.mode === "coindash" ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.08)");
   bodyGlow.addColorStop(1, "rgba(255,255,255,0)");
   ctx.fillStyle = bodyGlow;
   ctx.beginPath();
@@ -2913,6 +3221,7 @@ function drawRunnerUi() {
   }
 
   const remaining = Math.max(0, Math.floor((state.runner.portalDistance - state.runner.distance) / 10));
+  const nextObstacle = getNextRunnerObstacle();
   const panelGradient = ctx.createLinearGradient(14, 14, 350, 106);
   panelGradient.addColorStop(0, "rgba(10, 20, 38, 0.82)");
   panelGradient.addColorStop(1, "rgba(26, 45, 72, 0.62)");
@@ -2932,6 +3241,19 @@ function drawRunnerUi() {
   ctx.fillText(`Banemynter: ${state.runner.collectedCoins}   Fullf\u00f8r: +${state.runner.clearBonusCoins} bonus`, 24, 78);
   ctx.fillStyle = "#fecdd3";
   ctx.fillText(`Krasj: -${Math.min(state.coins, state.runner.failCoinPenalty || runnerFailCoinPenalty)} run-mynter`, 24, 98);
+
+  if (nextObstacle && nextObstacle.x < width + 40) {
+    const action = nextObstacle.type === "high" ? "DUKK" : "HOPP";
+    const accent = nextObstacle.type === "high" ? "#c77dff" : "#ff6b6b";
+    const hintDistance = Math.max(0, Math.floor((nextObstacle.x - runnerPlayerX) / 12));
+    ctx.fillStyle = "rgba(15, 23, 42, 0.84)";
+    ctx.fillRect(238, 58, 108, 42);
+    ctx.fillStyle = accent;
+    ctx.font = "bold 18px Trebuchet MS";
+    ctx.fillText(action, 248, 78);
+    ctx.font = "12px Trebuchet MS";
+    ctx.fillText(`${hintDistance} m`, 249, 95);
+  }
 }
 
 function drawStatusEffects() {
@@ -2944,6 +3266,12 @@ function drawStatusEffects() {
   }
   if (isJetpackActive()) {
     labels.push({ text: "JETPACK", color: "#ffb366" });
+  }
+  if (isFireworksActive()) {
+    labels.push({ text: "FYRVERKERI", color: "#fff0a6" });
+  }
+  if (state.spectacle.reserveLife) {
+    labels.push({ text: "EKSTRALIV", color: "#7cff95" });
   }
   if (!labels.length) {
     return;
@@ -3051,6 +3379,32 @@ function drawSpecialModeUi() {
 
   if (state.mode === "coindash") {
     ctx.save();
+    const celebrate = state.elapsedMs < state.coinDash.celebrationUntil;
+    const laneFlash = state.elapsedMs < state.coinDash.laneFlashUntil;
+    const playerCenterX = state.player.x + state.player.w / 2;
+    const playerCenterY = state.player.y + state.player.h * 0.72;
+    const spotlight = ctx.createRadialGradient(playerCenterX, playerCenterY, 10, playerCenterX, playerCenterY, 90);
+    spotlight.addColorStop(0, celebrate ? "rgba(255,240,180,0.34)" : laneFlash ? "rgba(125,211,252,0.28)" : "rgba(255,255,255,0.18)");
+    spotlight.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = spotlight;
+    ctx.fillRect(state.player.x - 60, state.player.y - 44, state.player.w + 120, state.player.h + 100);
+
+    if (laneFlash || celebrate) {
+      ctx.save();
+      ctx.globalAlpha = celebrate ? 0.5 : 0.35;
+      ctx.strokeStyle = celebrate ? "#fff0a6" : "#7dd3fc";
+      ctx.lineWidth = 4;
+      for (let i = 0; i < 3; i += 1) {
+        const startX = state.player.x - 38 - i * 14;
+        const y = state.player.y + 26 + i * 12;
+        ctx.beginPath();
+        ctx.moveTo(startX, y);
+        ctx.lineTo(startX + 32, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     for (const pickup of state.coinDash.pickups) {
       if (pickup.type === "coin") {
         const glow = ctx.createRadialGradient(pickup.x, pickup.y, 2, pickup.x, pickup.y, pickup.r * 2.4);
@@ -3082,7 +3436,7 @@ function drawSpecialModeUi() {
     panel.addColorStop(0, "rgba(13, 18, 34, 0.82)");
     panel.addColorStop(1, "rgba(12, 58, 84, 0.72)");
     ctx.fillStyle = panel;
-    ctx.fillRect(16, 16, 324, 98);
+    ctx.fillRect(16, 16, 324, 112);
     ctx.fillStyle = "#ffe066";
     ctx.font = "bold 22px Trebuchet MS";
     ctx.fillText("Coin Dash", 30, 42);
@@ -3090,8 +3444,16 @@ function drawSpecialModeUi() {
     ctx.font = "16px Trebuchet MS";
     ctx.fillText("Tid igjen: " + Math.max(0, Math.ceil((state.coinDash.endAt - state.elapsedMs) / 1000)) + "s", 30, 68);
     ctx.fillText("Bonusmynter: " + state.coinDash.collected, 30, 90);
-    ctx.fillStyle = "rgba(255,255,255,0.72)";
-    ctx.fillText("Venstre/h\u00f8yre flytter deg mellom banene", 30, 112);
+    ctx.fillStyle = celebrate ? "#fff0a6" : "rgba(255,255,255,0.72)";
+    ctx.fillText("Din figur: " + getSelectedSkin().name, 30, 112);
+    ctx.fillStyle = "rgba(15, 23, 42, 0.78)";
+    ctx.fillRect(238, height - 118, 110, 72);
+    ctx.fillStyle = laneFlash ? "#fff0a6" : "#7dd3fc";
+    ctx.font = "bold 15px Trebuchet MS";
+    ctx.fillText(["VENSTRE", "MIDT", "HOYRE"][state.coinDash.lane], 250, height - 86);
+    ctx.fillStyle = "rgba(255,255,255,0.74)";
+    ctx.font = "12px Trebuchet MS";
+    ctx.fillText("aktiv bane", 250, height - 66);
     ctx.restore();
   }
 }
@@ -3552,19 +3914,6 @@ updateControlModeUi();
 updateTouchButtonsVisibility();
 fetchLeaderboard();
 requestAnimationFrame(loop);
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
